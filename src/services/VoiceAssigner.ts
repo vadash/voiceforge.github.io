@@ -119,7 +119,31 @@ export class VoiceAssigner {
       }
     }
 
+    // Add unnamed speaker voices
+    this.addUnnamedSpeakerVoices(result);
+
     return result;
+  }
+
+  /**
+   * Add voices for unnamed speakers (MALE_UNNAMED, FEMALE_UNNAMED, UNKNOWN_UNNAMED)
+   */
+  private addUnnamedSpeakerVoices(voiceMap: Map<string, string>): void {
+    // Assign 3 voices for each gender category (for variety)
+    const maleVoices: string[] = [];
+    const femaleVoices: string[] = [];
+    const unknownVoices: string[] = [];
+
+    for (let i = 0; i < 3; i++) {
+      maleVoices.push(this.selectVoiceByGender('male'));
+      femaleVoices.push(this.selectVoiceByGender('female'));
+      unknownVoices.push(this.selectVoiceByGender('unknown'));
+    }
+
+    // Use first voice for the unnamed categories
+    voiceMap.set('MALE_UNNAMED', maleVoices[0]);
+    voiceMap.set('FEMALE_UNNAMED', femaleVoices[0]);
+    voiceMap.set('UNKNOWN_UNNAMED', unknownVoices[0]);
   }
 
   /**

@@ -220,6 +220,7 @@ Extract all speaking characters from the provided text block.
 5. Ignore the narrator - only extract characters who speak dialogue
 6. Attribution phrases like "said John" or "he replied" indicate the speaker
 7. Inner thoughts without quotes are NOT dialogue - ignore them
+8. Exclude unnamed/anonymous speakers ("a voice said", "the girl replied") - they are handled separately
 </rules>
 
 <example>
@@ -280,9 +281,11 @@ For each sentence with dialogue, output its index and speaker code. Skip narrato
 <rules>
 1. Narrator: descriptions, actions, thoughts without quotes - DO NOT OUTPUT these
 2. Character: ANY sentence with dialogue in quotes ("...", «...») - OUTPUT index:code
-3. If unsure, skip the sentence (defaults to narrator)
+3. Unnamed speaker ("the girl said", "a man shouted"): use gender codes (MALE_UNNAMED/FEMALE_UNNAMED/UNKNOWN_UNNAMED)
 4. Dialogue continuation: same speaker continues until new attribution
 5. Pronouns ("she said") refer to most recent character of matching gender
+6. Multi-line dialogue: if one speech spans multiple [index] lines, tag each line
+7. Reported speech inside narrative ("he ranted about X") = skip (narrator)
 </rules>
 
 <codes>
@@ -293,14 +296,16 @@ ${codesSection}
 Input:
 [0] Мария вошла в комнату.
 [1] «Привет!» — сказала она.
-[2] Иван улыбнулся.
+[2] Какой-то мужчина улыбнулся.
 [3] «Рад тебя видеть», — ответил он.
+[4] «Кто вы?» — спросила девушка у двери.
 
-Codes: A=Мария, B=Иван
+Codes: A=Мария, B=MALE_UNNAMED, C=FEMALE_UNNAMED, D=UNKNOWN_UNNAMED
 
 Output:
 1:A
 3:B
+4:C
 </example>
 
 <output_format>
@@ -538,7 +543,7 @@ Tag speakers. Output index:code for each dialogue sentence.`;
   }
 
   /**
-   * Build code mapping from character names
+   * Build code mapping from character names (adds unnamed speaker codes at the end)
    */
   private buildCodeMappingFromNames(names: string[]): {
     nameToCode: Map<string, string>;
@@ -553,6 +558,20 @@ Tag speakers. Output index:code for each dialogue sentence.`;
       nameToCode.set(name, code);
       codeToName.set(code, name);
     });
+
+    // Add unnamed speaker codes dynamically after character codes
+    const nextIndex = names.length;
+    const unnamedCodes = [
+      { name: 'MALE_UNNAMED', index: nextIndex },
+      { name: 'FEMALE_UNNAMED', index: nextIndex + 1 },
+      { name: 'UNKNOWN_UNNAMED', index: nextIndex + 2 },
+    ];
+
+    for (const { name, index } of unnamedCodes) {
+      const code = index < CODES.length ? CODES[index] : `X${index}`;
+      nameToCode.set(name, code);
+      codeToName.set(code, name);
+    }
 
     return { nameToCode, codeToName };
   }
