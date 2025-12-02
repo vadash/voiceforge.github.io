@@ -29,7 +29,7 @@ interface ActiveWorker {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 3000, 5000]; // Exponential backoff
-const WORKER_START_DELAY = 2000; // 2 seconds delay between starting workers
+const WORKER_START_DELAY = 500; // 500 ms seconds delay between starting workers
 
 export class TTSWorkerPool {
   private queue: PoolTask[] = [];
