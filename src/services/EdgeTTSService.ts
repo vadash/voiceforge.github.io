@@ -130,12 +130,7 @@ export class EdgeTTSService {
       if (this.endMessageReceived) {
         this.updateStatus('Processing');
       } else {
-        this.updateStatus('Error - Restarting');
-        // Auto-retry after 10 seconds
-        setTimeout(() => {
-          this.clear();
-          this.start();
-        }, 10000);
+        this.onError?.(new Error('WebSocket closed unexpectedly'));
       }
     }
   }
