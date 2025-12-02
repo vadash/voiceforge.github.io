@@ -12,7 +12,6 @@ export interface TTSWorkerOptions {
   filenum: string;
   config: TTSConfig;
   text: string;
-  saveToDir?: FileSystemDirectoryHandle | null;
   onStatusUpdate?: (update: StatusUpdate) => void;
   onComplete?: (audioData: Uint8Array) => void;
   onError?: (error: Error) => void;
@@ -25,14 +24,12 @@ export class EdgeTTSService {
   private socket: WebSocket | null = null;
   private mp3Saved = false;
   private endMessageReceived = false;
-  private startSave = false;
 
   private indexPart: number;
   private filename: string;
   private filenum: string;
   private config: TTSConfig;
   private text: string;
-  private saveToDir: FileSystemDirectoryHandle | null;
   private onStatusUpdate?: (update: StatusUpdate) => void;
   private onComplete?: (audioData: Uint8Array) => void;
   private onError?: (error: Error) => void;
@@ -47,7 +44,6 @@ export class EdgeTTSService {
     this.filenum = options.filenum;
     this.config = options.config;
     this.text = options.text;
-    this.saveToDir = options.saveToDir ?? null;
     this.onStatusUpdate = options.onStatusUpdate;
     this.onComplete = options.onComplete;
     this.onError = options.onError;
@@ -75,7 +71,6 @@ export class EdgeTTSService {
     this.endMessageReceived = false;
     this.audioData = new Uint8Array(0);
     this.audioChunks = [];
-    this.startSave = false;
   }
 
   private dateToString(): string {
@@ -176,45 +171,10 @@ export class EdgeTTSService {
 
     this.mp3Saved = true;
 
-    if (this.saveToDir) {
-      await this.saveToDirectory();
-    } else {
-      this.downloadFile();
-    }
-
-    this.updateStatus('Saved');
+    // Don't save individual chunks - AudioMerger handles merging and saving
+    // Just pass audio data to callback
+    this.updateStatus('Complete');
     this.onComplete?.(this.audioData);
-  }
-
-  private async saveToDirectory(): Promise<void> {
-    if (this.startSave || !this.saveToDir) return;
-    this.startSave = true;
-
-    try {
-      const blob = new Blob([this.audioData.slice().buffer], { type: 'audio/mpeg' });
-      const folderHandle = await this.saveToDir.getDirectoryHandle(this.filename, { create: true });
-      const fileHandle = await folderHandle.getFileHandle(`${this.filename} ${this.filenum}.mp3`, { create: true });
-      const writableStream = await fileHandle.createWritable();
-      await writableStream.write(blob);
-      await writableStream.close();
-      this.clear();
-    } catch (err) {
-      console.error('Error saving to directory:', err);
-      this.onError?.(err as Error);
-    }
-  }
-
-  private downloadFile(): void {
-    const blob = new Blob([this.audioData.slice().buffer], { type: 'audio/mpeg' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${this.filename} ${this.filenum}.mp3`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    this.clear();
   }
 
   private makeSSML(): string {

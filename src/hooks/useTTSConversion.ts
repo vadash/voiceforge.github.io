@@ -274,7 +274,6 @@ export function useTTSConversion() {
     const pool = new TTSWorkerPool({
       maxWorkers: maxThreads.value,
       config: config,
-      saveToDir: null,
       onStatusUpdate: (update) => {
         addStatusLine(update.message);
       },

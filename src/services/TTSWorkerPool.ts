@@ -15,7 +15,6 @@ export interface PoolTask {
 export interface WorkerPoolOptions {
   maxWorkers: number;
   config: TTSConfig;
-  saveToDir?: FileSystemDirectoryHandle | null;
   onStatusUpdate?: (update: StatusUpdate) => void;
   onTaskComplete?: (partIndex: number, audioData: Uint8Array) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
@@ -43,7 +42,6 @@ export class TTSWorkerPool {
 
   private maxWorkers: number;
   private config: TTSConfig;
-  private saveToDir: FileSystemDirectoryHandle | null;
   private onStatusUpdate?: (update: StatusUpdate) => void;
   private onTaskComplete?: (partIndex: number, audioData: Uint8Array) => void;
   private onTaskError?: (partIndex: number, error: Error) => void;
@@ -52,7 +50,6 @@ export class TTSWorkerPool {
   constructor(options: WorkerPoolOptions) {
     this.maxWorkers = options.maxWorkers;
     this.config = options.config;
-    this.saveToDir = options.saveToDir ?? null;
     this.onStatusUpdate = options.onStatusUpdate;
     this.onTaskComplete = options.onTaskComplete;
     this.onTaskError = options.onTaskError;
@@ -103,7 +100,6 @@ export class TTSWorkerPool {
       filenum: task.filenum,
       config: taskConfig,
       text: task.text,
-      saveToDir: null, // Don't save individual files - we'll merge them
       onStatusUpdate: (update) => {
         this.onStatusUpdate?.(update);
       },
