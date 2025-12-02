@@ -2,10 +2,10 @@ import { Text } from 'preact-i18n';
 import { pointsSelect, pointsType } from '../../state/appState';
 
 const POINTS_OPTIONS = [
-  'Не заменять точки',
-  'Заменять точки на ,',
-  'Заменять точки на ;',
-  'Заменять точки на :',
+  'Don\'t replace periods',
+  'Replace periods with ,',
+  'Replace periods with ;',
+  'Replace periods with :',
 ];
 
 export function PointsSelector() {

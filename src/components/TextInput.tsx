@@ -7,7 +7,7 @@ export function TextInput() {
     <textarea
       class="text-input"
       id="text-area"
-      placeholder="Текст..."
+      placeholder="Text..."
       value={textContent.value}
       onInput={(e) => textContent.value = (e.target as HTMLTextAreaElement).value}
       style={{

@@ -23,7 +23,7 @@ export function App() {
             class="settings-toggle"
             onClick={() => isLiteMode.value = !isLiteMode.value}
           >
-            <Text id="settings.toggle">Настройки</Text>
+            <Text id="settings.toggle">Settings</Text>
           </button>
         </div>
 
@@ -37,7 +37,7 @@ export function App() {
         <ConvertButton />
       </aside>
 
-      <main class={`main-content ${isProcessing.value ? 'hidden' : ''}`}>
+      <main class="main-content">
         {!isLiteMode.value && <TextInput />}
       </main>
 

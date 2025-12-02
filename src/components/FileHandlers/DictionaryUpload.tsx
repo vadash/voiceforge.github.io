@@ -25,7 +25,7 @@ export function DictionaryUpload() {
   return (
     <label>
       <span style={{ display: 'block', textAlign: 'center', paddingBottom: '0.25rem' }}>
-        <Text id="files.dictionary">Словарь</Text>
+        <Text id="files.dictionary">Dictionary</Text>
         {dictionary.value.length > 0 && (
           <span style={{ color: 'var(--accent)' }}> ({dictionary.value.length})</span>
         )}

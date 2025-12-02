@@ -3,7 +3,7 @@ import {
   rate, pitch, maxThreads, mergeFiles,
   rateDisplay, pitchDisplay, mergeDisplay,
   showDopSettings, lexxRegister,
-  saveSettings
+  saveSettings, saveLLMSettings
 } from '../../state/appState';
 import { Slider } from './Slider';
 import { PointsSelector } from './PointsSelector';
@@ -18,7 +18,7 @@ export function SettingsPanel() {
         <PointsSelector />
 
       <Slider
-        label={<Text id="settings.rate">Скорость</Text>}
+        label={<Text id="settings.rate">Speed</Text>}
         value={rate.value}
         min={-50}
         max={100}
@@ -32,14 +32,14 @@ export function SettingsPanel() {
         style={{ cursor: 'pointer', textAlign: 'center', marginBottom: '0.5rem' }}
       >
         <label style={{ cursor: 'pointer' }}>
-          {showDopSettings.value ? '▲' : '▼'} <Text id="settings.toggle">Дополнительно</Text>
+          {showDopSettings.value ? '▲' : '▼'} <Text id="settings.additional">Additional</Text>
         </label>
       </div>
 
       {showDopSettings.value && (
         <div class="dop-settings">
           <Slider
-            label={<Text id="settings.pitch">Высота</Text>}
+            label={<Text id="settings.pitch">Pitch</Text>}
             value={pitch.value}
             min={-50}
             max={50}
@@ -48,7 +48,7 @@ export function SettingsPanel() {
           />
 
           <Slider
-            label={<Text id="settings.threads">Потоков</Text>}
+            label={<Text id="settings.threads">Threads</Text>}
             value={maxThreads.value}
             min={1}
             max={30}
@@ -57,7 +57,7 @@ export function SettingsPanel() {
           />
 
           <Slider
-            label={<Text id="settings.merge">Объединять</Text>}
+            label={<Text id="settings.merge">Merge</Text>}
             value={mergeFiles.value}
             min={1}
             max={100}
@@ -66,7 +66,7 @@ export function SettingsPanel() {
           />
 
           <label class="toggle-wrapper">
-            <span><Text id="settings.dictionary.caseSensitive">Регистр словаря</Text></span>
+            <span><Text id="settings.dictionary.caseSensitive">Dictionary case</Text></span>
             <input
               type="checkbox"
               class="toggle"
@@ -78,10 +78,10 @@ export function SettingsPanel() {
       )}
 
       <button
-        onClick={saveSettings}
+        onClick={() => { saveSettings(); saveLLMSettings(); }}
         style={{ width: '100%', marginBottom: '1rem' }}
       >
-        💾 <Text id="settings.save">Сохранить настройки</Text>
+        💾 <Text id="settings.save">Save Settings</Text>
       </button>
       </div>
     </div>

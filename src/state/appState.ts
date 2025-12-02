@@ -29,7 +29,7 @@ export const rate = signal<number>(0);
 export const pitch = signal<number>(0);
 export const maxThreads = signal<number>(20);
 export const mergeFiles = signal<number>(10);
-export const pointsSelect = signal<string>('Не заменять точки');
+export const pointsSelect = signal<string>('Don\'t replace periods');
 export const pointsType = signal<'V1' | 'V2' | 'V3'>('V1');
 export const lexxRegister = signal<boolean>(true);
 
@@ -41,13 +41,13 @@ export const pitchDisplay = computed(() =>
   pitch.value >= 0 ? `+${pitch.value}Hz` : `${pitch.value}Hz`
 );
 export const mergeDisplay = computed(() =>
-  mergeFiles.value >= 100 ? 'ВСЕ' : `${mergeFiles.value} шт.`
+  mergeFiles.value >= 100 ? 'ALL' : `${mergeFiles.value}`
 );
 
 // UI State
 export const isLiteMode = signal<boolean>(true);
 export const showDopSettings = signal<boolean>(false);
-export const statusAreaWidth = signal<number>(350);
+export const statusAreaWidth = signal<number>(450);
 
 // Data State
 export const dictionary = signal<string[]>([]);
@@ -104,12 +104,12 @@ export function loadSettings(): void {
       pitch.value = settings.pitch ?? 0;
       maxThreads.value = settings.maxThreads ?? 20;
       mergeFiles.value = settings.mergeFiles ?? 10;
-      pointsSelect.value = settings.pointsSelect ?? 'Не заменять точки';
+      pointsSelect.value = settings.pointsSelect ?? 'Don\'t replace periods';
       pointsType.value = settings.pointsType ?? 'V1';
       lexxRegister.value = settings.lexxRegister ?? true;
       showDopSettings.value = settings.showDopSettings ?? false;
       isLiteMode.value = settings.isLiteMode ?? true;
-      statusAreaWidth.value = settings.statusAreaWidth ?? 350;
+      statusAreaWidth.value = settings.statusAreaWidth ?? 450;
     }
   } catch (e) {
     console.error('Failed to load settings:', e);

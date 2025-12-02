@@ -36,7 +36,7 @@ export function FileUpload() {
   return (
     <label>
       <span style={{ display: 'block', textAlign: 'center', paddingBottom: '0.25rem' }}>
-        <Text id="files.upload">Файл</Text>
+        <Text id="files.upload">File</Text>
       </span>
       <input
         ref={inputRef}

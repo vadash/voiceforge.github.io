@@ -93,8 +93,8 @@ export class TextProcessor {
     }
 
     // Apply points replacement
-    if (this.pointsSelect !== 'Не заменять точки') {
-      if (this.pointsSelect === 'Заменять на три строки') {
+    if (this.pointsSelect !== 'Don\'t replace periods') {
+      if (this.pointsSelect === 'Replace with triple newlines') {
         fixText = fixText.replace(/\./g, '\r\n\r\n\r\n\r\n');
       } else {
         const newPoint = this.pointsSelect[this.pointsSelect.length - 1];

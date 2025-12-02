@@ -25,9 +25,9 @@ export function ConvertButton() {
       disabled={isProcessing.value}
     >
       {isProcessing.value ? (
-        <Text id="status.processing">Обработка...</Text>
+        <Text id="status.processing">Processing...</Text>
       ) : (
-        <Text id="convert.button">Сохранить в MP3</Text>
+        <Text id="convert.button">Save to MP3</Text>
       )}
     </button>
   );

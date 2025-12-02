@@ -23,7 +23,6 @@ import {
   clearStatus,
   savePathHandle,
   // LLM state
-  llmEnabled,
   llmApiKey,
   llmApiUrl,
   llmModel,
@@ -85,13 +84,8 @@ export function useTTSConversion() {
     }
 
     // Check LLM mode - LLM is required for conversion
-    if (!llmEnabled.value) {
-      addStatusLine('❌ LLM mode is disabled. Please enable LLM in settings to convert.');
-      return;
-    }
-
     if (!isLLMConfigured()) {
-      addStatusLine('❌ LLM mode enabled but not configured. Please set API key in settings.');
+      addStatusLine('❌ LLM not configured. Please set API key in settings.');
       llmError.value = 'LLM not configured';
       return;
     }
@@ -146,49 +140,15 @@ export function useTTSConversion() {
         addStatusLine(`  - ${char.canonicalName} (${char.gender}): ${voice}`);
       }
 
-      // Set status to review - user will see CharacterReviewPanel
-      llmProcessingStatus.value = 'review';
-      isProcessing.value = false;
-
-      addStatusLine('📝 Review characters above, then click "Continue to TTS"');
-
-    } catch (err) {
-      const errorMsg = (err as Error).message;
-      addStatusLine(`❌ Pass 1 error: ${errorMsg}`);
-      llmError.value = errorMsg;
-      llmProcessingStatus.value = 'error';
-      isProcessing.value = false;
-    }
-  };
-
-  /**
-   * Continue after character review: Pass 2 + TTS
-   */
-  const continueAfterReview = useCallback(async () => {
-    if (llmProcessingStatus.value !== 'review') {
-      addStatusLine('Not in review state');
-      return;
-    }
-
-    isProcessing.value = true;
-    llmProcessingStatus.value = 'pass2';
-
-    try {
+      // Auto-continue to Pass 2 (no manual review step)
       addStatusLine('🤖 Starting LLM speaker assignment (Pass 2)...');
+      llmProcessingStatus.value = 'pass2';
 
-      const llmService = new LLMVoiceService({
-        apiKey: llmApiKey.value,
-        apiUrl: llmApiUrl.value,
-        model: llmModel.value,
-        narratorVoice: narratorVoice.value,
-      });
-
-      const splitter = new TextBlockSplitter();
-      const blocks = splitter.createPass2Blocks(pendingTextRef.current);
-      llmTotalBlocks.value = blocks.length;
+      const pass2Blocks = splitter.createPass2Blocks(text);
+      llmTotalBlocks.value = pass2Blocks.length;
 
       const assignments = await llmService.assignSpeakers(
-        blocks,
+        pass2Blocks,
         characterVoiceMap.value,
         (current, total) => {
           llmCurrentBlock.value = current;
@@ -208,12 +168,12 @@ export function useTTSConversion() {
 
     } catch (err) {
       const errorMsg = (err as Error).message;
-      addStatusLine(`❌ Pass 2 error: ${errorMsg}`);
+      addStatusLine(`❌ Pass 1 error: ${errorMsg}`);
       llmError.value = errorMsg;
       llmProcessingStatus.value = 'error';
       isProcessing.value = false;
     }
-  }, []);
+  };
 
   /**
    * Cancel LLM processing
@@ -397,7 +357,6 @@ export function useTTSConversion() {
 
   return {
     startConversion,
-    continueAfterReview,
     cancelLLMProcessing,
     selectDirectory,
     isProcessing: isProcessing.value,

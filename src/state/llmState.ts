@@ -2,7 +2,7 @@ import { signal } from '@preact/signals';
 import type { LLMCharacter } from './types';
 
 // LLM Settings (persisted to localStorage)
-export const llmEnabled = signal<boolean>(false);
+export const llmEnabled = signal<boolean>(true);
 export const llmApiKey = signal<string>('');
 export const llmApiUrl = signal<string>('https://api.openai.com/v1');
 export const llmModel = signal<string>('gpt-4o-mini');
@@ -43,7 +43,7 @@ export function loadLLMSettings(): void {
     const saved = localStorage.getItem(LLM_SETTINGS_KEY);
     if (saved) {
       const settings: LLMSettings = JSON.parse(saved);
-      llmEnabled.value = settings.enabled ?? false;
+      llmEnabled.value = settings.enabled ?? true;
       llmApiKey.value = settings.apiKey ?? '';
       llmApiUrl.value = settings.apiUrl ?? 'https://api.openai.com/v1';
       llmModel.value = settings.model ?? 'gpt-4o-mini';
@@ -63,5 +63,5 @@ export function resetLLMState(): void {
 }
 
 export function isLLMConfigured(): boolean {
-  return llmEnabled.value && llmApiKey.value.length > 0;
+  return llmApiKey.value.length > 0;
 }
