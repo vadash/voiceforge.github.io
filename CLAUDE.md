@@ -31,12 +31,31 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 - **FileConverter**: Converts FB2 (XML parser), EPUB (JSZip + NCX navigation), ZIP archives to plain text.
 - **AudioMerger**: Concatenates MP3 chunks based on merge count setting, respects file boundaries.
 
+### LLM Voice Assignment System
+
+Optional feature for multi-voice audiobooks using LLM-based character detection:
+
+- **TextBlockSplitter**: Splits text into sentences and blocks for LLM processing. Uses 16k token blocks for Pass 1, 8k for Pass 2.
+- **LLMVoiceService**: Two-pass LLM system using OpenAI-compatible API:
+  - Pass 1: Extracts characters from text (sequential processing, detects gender/name variations)
+  - Pass 2: Assigns speakers to sentences (parallel, up to 20 concurrent requests)
+  - Infinite retry with exponential backoff (1s → 10min delays)
+- **VoiceAssigner**: Assigns unique voices to characters based on detected gender, avoiding duplicates.
+- **VoicePoolBuilder**: Builds voice pools filtered by locale/gender (ru-*, en-*, multilingual voices).
+
 ### State Management (`src/state/`)
 
-Uses Preact Signals for reactive state. Key signals in `appState.ts`:
+Uses Preact Signals for reactive state.
+
+**appState.ts**:
 - Settings: `voice`, `rate`, `pitch`, `maxThreads`, `mergeFiles`
 - Processing: `isProcessing`, `processedCount`, `totalCount`, `statusLines`
 - Data: `dictionary`, `textContent`, `book`
+
+**llmState.ts** (LLM voice assignment):
+- Settings: `llmEnabled`, `llmApiKey`, `llmApiUrl`, `llmModel`
+- Processing: `llmProcessingStatus`, `llmCurrentBlock`, `llmTotalBlocks`
+- Data: `detectedCharacters`, `characterVoiceMap`
 
 Settings persist to localStorage.
 
