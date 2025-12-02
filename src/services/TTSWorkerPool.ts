@@ -31,7 +31,7 @@ const INITIAL_DELAY = 10000; // 10 seconds
 const SECOND_DELAY = 30000; // 30 seconds
 const DELAY_MULTIPLIER = 3;
 const MAX_DELAY = 600000; // 10 minutes
-const THREADS_PER_MINUTE = 60; // 1 thread per second
+const THREADS_PER_MINUTE = 90; // 1.5 threads per second
 const START_DELAY = 60000 / THREADS_PER_MINUTE; // 1000ms
 const ERROR_COOLDOWN = 10000; // 10 seconds - no new threads after any error
 
