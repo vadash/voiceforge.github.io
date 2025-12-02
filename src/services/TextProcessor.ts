@@ -93,11 +93,15 @@ export class TextProcessor {
     }
 
     // Apply points replacement
-    if (this.pointsSelect !== 'Don\'t replace periods') {
-      if (this.pointsSelect === 'Replace with triple newlines') {
-        fixText = fixText.replace(/\./g, '\r\n\r\n\r\n\r\n');
-      } else {
-        const newPoint = this.pointsSelect[this.pointsSelect.length - 1];
+    if (this.pointsSelect !== 'none') {
+      // Get the replacement character from the key
+      const replacements: Record<string, string> = {
+        'comma': ',',
+        'semicolon': ';',
+        'colon': ':',
+      };
+      const newPoint = replacements[this.pointsSelect];
+      if (newPoint) {
         if (this.pointsType === 'V1') {
           fixText = fixText.replace(/\./g, newPoint);
         } else if (this.pointsType === 'V2') {

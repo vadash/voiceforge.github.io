@@ -1,14 +1,19 @@
-import { Text } from 'preact-i18n';
+import { Text, useText } from 'preact-i18n';
 import { pointsSelect, pointsType } from '../../state/appState';
 
-const POINTS_OPTIONS = [
-  'Don\'t replace periods',
-  'Replace periods with ,',
-  'Replace periods with ;',
-  'Replace periods with :',
-];
+// Use keys for internal logic, i18n for display
+const POINTS_OPTIONS = ['none', 'comma', 'semicolon', 'colon'] as const;
 
 export function PointsSelector() {
+  const { none, comma, semicolon, colon } = useText({
+    none: 'settings.points.none',
+    comma: 'settings.points.comma',
+    semicolon: 'settings.points.semicolon',
+    colon: 'settings.points.colon',
+  });
+
+  const labels: Record<string, string> = { none, comma, semicolon, colon };
+
   const cyclePointsType = () => {
     const types: Array<'V1' | 'V2' | 'V3'> = ['V1', 'V2', 'V3'];
     const currentIndex = types.indexOf(pointsType.value);
@@ -23,8 +28,8 @@ export function PointsSelector() {
         onChange={(e) => pointsSelect.value = (e.target as HTMLSelectElement).value}
         style={{ width: '80%', borderRadius: '10px' }}
       >
-        {POINTS_OPTIONS.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
+        {POINTS_OPTIONS.map((key) => (
+          <option key={key} value={key}>{labels[key]}</option>
         ))}
       </select>
       <button

@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { Text } from 'preact-i18n';
 import {
   llmApiKey,
   llmApiUrl,
@@ -45,13 +46,13 @@ export function LLMSettingsPanel() {
         }}
       >
         <span style={{ fontSize: '1.1rem' }}>🤖</span>
-        <span style={{ fontWeight: 'bold' }}>LLM Voice Assignment</span>
+        <span style={{ fontWeight: 'bold' }}><Text id="llm.title">LLM Voice Assignment</Text></span>
       </div>
 
       <div class="llm-settings-fields" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <div class="field">
           <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>
-            API Key
+            <Text id="llm.apiKey">API Key</Text>
           </label>
           <input
             type="password"
@@ -74,7 +75,7 @@ export function LLMSettingsPanel() {
 
         <div class="field">
           <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>
-            API URL
+            <Text id="llm.apiUrl">API URL</Text>
           </label>
           <input
             type="text"
@@ -97,7 +98,7 @@ export function LLMSettingsPanel() {
 
         <div class="field">
           <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>
-            Model
+            <Text id="llm.model">Model</Text>
           </label>
           <input
             type="text"
@@ -123,7 +124,7 @@ export function LLMSettingsPanel() {
           disabled={testing || !llmApiKey.value}
           style={{ width: '100%', marginTop: '0.5rem' }}
         >
-          {testing ? '⏳ Testing...' : '🔌 Test Connection'}
+          {testing ? <><Text id="llm.testing">Testing...</Text></> : <>🔌 <Text id="llm.testConnection">Test Connection</Text></>}
         </button>
 
         {testResult && (
@@ -138,7 +139,7 @@ export function LLMSettingsPanel() {
               fontSize: '0.9rem',
             }}
           >
-            {testResult.success ? '✅ Connection successful!' : `❌ ${testResult.error}`}
+            {testResult.success ? <>✅ <Text id="llm.connectionSuccess">Connection successful!</Text></> : `❌ ${testResult.error}`}
           </div>
         )}
       </div>

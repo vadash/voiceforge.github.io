@@ -4,18 +4,20 @@
   },
   "settings": {
     "toggle": "Settings",
+    "additional": "Additional",
+    "save": "Save Settings",
     "voice": "Voice",
     "rate": "Speed",
     "pitch": "Pitch",
     "threads": "Threads",
-    "merge": "Merge files",
+    "merge": "Merge",
     "mergeAll": "ALL",
     "points": {
       "label": "Point replacement",
-      "none": "Don't replace points",
-      "space": "Space",
-      "newline": "New line",
-      "doubleNewline": "Double newline"
+      "none": "Don't replace periods",
+      "comma": "Replace periods with ,",
+      "semicolon": "Replace periods with ;",
+      "colon": "Replace periods with :"
     },
     "pointsType": {
       "v1": "V1",
@@ -24,12 +26,22 @@
     },
     "dictionary": {
       "label": "Dictionary register",
-      "caseSensitive": "Case sensitive"
+      "caseSensitive": "Dictionary case"
     }
+  },
+  "llm": {
+    "title": "LLM Voice Assignment",
+    "apiKey": "API Key",
+    "apiUrl": "API URL",
+    "model": "Model",
+    "testConnection": "Test Connection",
+    "testing": "Testing...",
+    "connectionSuccess": "Connection successful!",
+    "connectionError": "Connection failed"
   },
   "files": {
     "dictionary": "Dictionary",
-    "upload": "Upload file",
+    "upload": "File",
     "formats": "txt, fb2, epub, ini, zip"
   },
   "convert": {
@@ -41,5 +53,8 @@
     "processing": "Processing...",
     "completed": "Completed",
     "error": "Error"
+  },
+  "text": {
+    "placeholder": "Text..."
   }
 }

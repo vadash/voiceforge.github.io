@@ -29,7 +29,7 @@ export const rate = signal<number>(0);
 export const pitch = signal<number>(0);
 export const maxThreads = signal<number>(20);
 export const mergeFiles = signal<number>(10);
-export const pointsSelect = signal<string>('Don\'t replace periods');
+export const pointsSelect = signal<string>('none');
 export const pointsType = signal<'V1' | 'V2' | 'V3'>('V1');
 export const lexxRegister = signal<boolean>(true);
 
@@ -104,7 +104,7 @@ export function loadSettings(): void {
       pitch.value = settings.pitch ?? 0;
       maxThreads.value = settings.maxThreads ?? 20;
       mergeFiles.value = settings.mergeFiles ?? 10;
-      pointsSelect.value = settings.pointsSelect ?? 'Don\'t replace periods';
+      pointsSelect.value = settings.pointsSelect ?? 'none';
       pointsType.value = settings.pointsType ?? 'V1';
       lexxRegister.value = settings.lexxRegister ?? true;
       showDopSettings.value = settings.showDopSettings ?? false;

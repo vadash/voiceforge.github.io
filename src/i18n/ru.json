@@ -4,18 +4,20 @@
   },
   "settings": {
     "toggle": "Настройки",
+    "additional": "Дополнительно",
+    "save": "Сохранить настройки",
     "voice": "Голос",
     "rate": "Скорость",
     "pitch": "Высота",
     "threads": "Потоков",
-    "merge": "Объединять файлов",
+    "merge": "Объединять",
     "mergeAll": "ВСЕ",
     "points": {
       "label": "Замена точек",
       "none": "Не заменять точки",
-      "space": "Пробел",
-      "newline": "Новая строка",
-      "doubleNewline": "Двойная строка"
+      "comma": "Заменять точки на ,",
+      "semicolon": "Заменять точки на ;",
+      "colon": "Заменять точки на :"
     },
     "pointsType": {
       "v1": "V1",
@@ -24,12 +26,22 @@
     },
     "dictionary": {
       "label": "Реестр словаря",
-      "caseSensitive": "Регистрозависимый"
+      "caseSensitive": "Регистр словаря"
     }
+  },
+  "llm": {
+    "title": "LLM Голосовое назначение",
+    "apiKey": "API Ключ",
+    "apiUrl": "API URL",
+    "model": "Модель",
+    "testConnection": "Тест соединения",
+    "testing": "Проверка...",
+    "connectionSuccess": "Соединение успешно!",
+    "connectionError": "Ошибка соединения"
   },
   "files": {
     "dictionary": "Словарь",
-    "upload": "Загрузить файл",
+    "upload": "Файл",
     "formats": "txt, fb2, epub, ini, zip"
   },
   "convert": {
@@ -41,5 +53,8 @@
     "processing": "Обработка...",
     "completed": "Завершено",
     "error": "Ошибка"
+  },
+  "text": {
+    "placeholder": "Текст..."
   }
 }
