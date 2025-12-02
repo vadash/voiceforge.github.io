@@ -110,6 +110,9 @@ export class LLMVoiceService {
     this.abortController = new AbortController();
     this.pass2Logged = false;
 
+    // Build code mapping from canonical names
+    const { nameToCode, codeToName } = this.buildCodeMappingFromNames(canonicalNames);
+
     // Process blocks in batches
     for (let i = 0; i < blocks.length; i += MAX_CONCURRENT) {
       if (this.abortController.signal.aborted) {
@@ -118,7 +121,7 @@ export class LLMVoiceService {
 
       const batch = blocks.slice(i, i + MAX_CONCURRENT);
       const batchPromises = batch.map((block) =>
-        this.processPass2Block(block, characterVoiceMap, canonicalNames)
+        this.processPass2Block(block, characterVoiceMap, nameToCode, codeToName)
       );
 
       const batchResults = await Promise.all(batchPromises);
@@ -141,30 +144,60 @@ export class LLMVoiceService {
   private async processPass2Block(
     block: TextBlock,
     characterVoiceMap: Map<string, string>,
-    canonicalNames: string[]
+    nameToCode: Map<string, string>,
+    codeToName: Map<string, string>
   ): Promise<SpeakerAssignment[]> {
     const numberedSentences = block.sentences
       .map((s, i) => `[${block.sentenceStartIndex + i}] ${s}`)
       .join('\n');
 
     const response = await this.callLLMWithRetry(
-      this.buildPass2Prompt(canonicalNames, numberedSentences, block.sentenceStartIndex),
-      (result) => this.validatePass2Response(result, block, characterVoiceMap),
+      this.buildPass2Prompt(nameToCode, numberedSentences, block.sentenceStartIndex),
+      (result) => this.validatePass2Response(result, block, codeToName),
       [],
       'pass2'
     );
 
-    const parsed = JSON.parse(response) as Pass2Response;
+    // Parse sparse response and build speaker assignments
+    const speakerMap = this.parsePass2Response(response, codeToName);
 
-    return parsed.sentences.map((s, i) => ({
-      sentenceIndex: block.sentenceStartIndex + i,
-      text: block.sentences[i],
-      speaker: s.speaker,
-      voiceId:
-        s.speaker === 'narrator'
-          ? this.options.narratorVoice
-          : characterVoiceMap.get(s.speaker) ?? this.options.narratorVoice,
-    }));
+    return block.sentences.map((text, i) => {
+      const index = block.sentenceStartIndex + i;
+      const speaker = speakerMap.get(index) || 'narrator';
+      return {
+        sentenceIndex: index,
+        text,
+        speaker,
+        voiceId:
+          speaker === 'narrator'
+            ? this.options.narratorVoice
+            : characterVoiceMap.get(speaker) ?? this.options.narratorVoice,
+      };
+    });
+  }
+
+  /**
+   * Parse sparse Pass 2 response (index:code format)
+   */
+  private parsePass2Response(
+    response: string,
+    codeToName: Map<string, string>
+  ): Map<number, string> {
+    const speakerMap = new Map<number, string>();
+
+    for (const line of response.trim().split('\n')) {
+      const match = line.trim().match(/^(\d+):([A-Za-z0-9]+)$/);
+      if (match) {
+        const index = parseInt(match[1]);
+        const code = match[2];
+        const name = codeToName.get(code);
+        if (name) {
+          speakerMap.set(index, name);
+        }
+      }
+    }
+
+    return speakerMap;
   }
 
   /**
@@ -224,37 +257,37 @@ Extract all speaking characters from this text. Return JSON only.`;
   }
 
   /**
-   * Build Pass 2 prompt (speaker assignment)
+   * Build Pass 2 prompt (speaker assignment with sparse output)
    */
   private buildPass2Prompt(
-    characterList: string[],
+    nameToCode: Map<string, string>,
     numberedSentences: string,
     startIndex: number
   ): { system: string; user: string } {
-    const chars = characterList.length > 0 ? characterList.join(', ') : '(no characters detected)';
+    // Build codes section
+    const codesSection = Array.from(nameToCode.entries())
+      .map(([name, code]) => `${code}=${name}`)
+      .join(', ');
+
     const system = `<role>
-You are a dialogue tagger for text-to-speech audiobook production.
+You are a dialogue tagger for audiobook production.
 </role>
 
 <task>
-For each numbered sentence, identify who is speaking.
+For each sentence with dialogue, output its index and speaker code. Skip narrator sentences.
 </task>
 
 <rules>
-1. "narrator" speaks: descriptions, actions, pure attribution without quotes (standalone "she said"), inner thoughts
-2. Character speaks: ANY sentence containing dialogue in quotation marks ("...", «...») - even partial quotes
-3. If a sentence contains ANY quoted dialogue, the CHARACTER speaks it (not narrator), regardless of other text
-4. Every sentence needs exactly one speaker
-5. When unsure, use "narrator"
-6. Dialogue continuation: if a character speaks and next sentence is also dialogue with no new attribution, same speaker continues
-7. Pronouns in attribution ("she said", "he replied") refer to the most recently named character of matching gender
-8. Split dialogue: when dialogue is broken across sentences (one ends mid-quote, next continues), both belong to same speaker
-9. Unquoted interjections in prose (thoughts like "Damn" without quotes) = narrator
+1. Narrator: descriptions, actions, thoughts without quotes - DO NOT OUTPUT these
+2. Character: ANY sentence with dialogue in quotes ("...", «...») - OUTPUT index:code
+3. If unsure, skip the sentence (defaults to narrator)
+4. Dialogue continuation: same speaker continues until new attribution
+5. Pronouns ("she said") refer to most recent character of matching gender
 </rules>
 
-<characters>
-${chars}
-</characters>
+<codes>
+${codesSection}
+</codes>
 
 <example>
 Input:
@@ -263,32 +296,24 @@ Input:
 [2] Иван улыбнулся.
 [3] «Рад тебя видеть», — ответил он.
 
+Codes: A=Мария, B=Иван
+
 Output:
-{
-  "sentences": [
-    {"index": 0, "speaker": "narrator"},
-    {"index": 1, "speaker": "Мария"},
-    {"index": 2, "speaker": "narrator"},
-    {"index": 3, "speaker": "Иван"}
-  ]
-}
+1:A
+3:B
 </example>
 
 <output_format>
-Respond with ONLY valid JSON, no markdown:
-{
-  "sentences": [
-    {"index": ${startIndex}, "speaker": "narrator"},
-    {"index": ${startIndex + 1}, "speaker": "CharacterName"}
-  ]
-}
+Output ONLY lines in format: index:code
+One line per speaking sentence. Empty output = all narrator.
+No JSON, no explanation.
 </output_format>`;
 
     const user = `<sentences>
 ${numberedSentences}
 </sentences>
 
-Tag the speaker for each sentence. Return JSON only.`;
+Tag speakers. Output index:code for each dialogue sentence.`;
 
     return { system, user };
   }
@@ -461,51 +486,75 @@ Tag the speaker for each sentence. Return JSON only.`;
   }
 
   /**
-   * Validate Pass 2 response
+   * Validate Pass 2 response (sparse format: index:code lines)
    */
   private validatePass2Response(
     response: string,
     block: TextBlock,
-    characterVoiceMap: Map<string, string>
+    codeToName: Map<string, string>
   ): LLMValidationResult {
     const errors: string[] = [];
+    const minIndex = block.sentenceStartIndex;
+    const maxIndex = block.sentenceStartIndex + block.sentences.length - 1;
 
-    try {
-      const parsed = JSON.parse(response);
+    // Empty response is valid (all narrator)
+    if (!response.trim()) {
+      return { valid: true, errors: [] };
+    }
 
-      if (!parsed.sentences || !Array.isArray(parsed.sentences)) {
-        errors.push('Response must have a "sentences" array');
-        return { valid: false, errors };
+    for (const line of response.trim().split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const match = trimmed.match(/^(\d+):([A-Za-z0-9]+)$/);
+      if (!match) {
+        errors.push(`Invalid format: "${trimmed}". Expected: index:code`);
+        continue;
       }
 
-      if (parsed.sentences.length !== block.sentences.length) {
-        errors.push(
-          `Expected ${block.sentences.length} sentences, got ${parsed.sentences.length}`
-        );
+      const index = parseInt(match[1]);
+      const code = match[2];
+
+      if (index < minIndex || index > maxIndex) {
+        errors.push(`Index ${index} out of range [${minIndex}-${maxIndex}]`);
       }
 
-      const validSpeakers = new Set(['narrator', ...characterVoiceMap.keys()]);
-
-      for (let i = 0; i < parsed.sentences.length; i++) {
-        const sent = parsed.sentences[i];
-
-        if (typeof sent.index !== 'number') {
-          errors.push(`Sentence ${i}: missing or invalid "index"`);
-        }
-
-        if (!sent.speaker || typeof sent.speaker !== 'string') {
-          errors.push(`Sentence ${i}: missing or invalid "speaker"`);
-        } else if (!validSpeakers.has(sent.speaker)) {
-          errors.push(
-            `Sentence ${i}: unknown speaker "${sent.speaker}". Valid: narrator, ${Array.from(characterVoiceMap.keys()).join(', ')}`
-          );
-        }
+      if (!codeToName.has(code)) {
+        errors.push(`Unknown code "${code}". Valid: ${Array.from(codeToName.keys()).join(', ')}`);
       }
-    } catch (e) {
-      errors.push(`Invalid JSON: ${(e as Error).message}`);
     }
 
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Build code mapping for characters (A-Z, 0-9, a-z = 62 codes)
+   */
+  private buildCodeMapping(characters: LLMCharacter[]): {
+    nameToCode: Map<string, string>;
+    codeToName: Map<string, string>;
+  } {
+    return this.buildCodeMappingFromNames(characters.map((c) => c.canonicalName));
+  }
+
+  /**
+   * Build code mapping from character names
+   */
+  private buildCodeMappingFromNames(names: string[]): {
+    nameToCode: Map<string, string>;
+    codeToName: Map<string, string>;
+  } {
+    const CODES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
+    const nameToCode = new Map<string, string>();
+    const codeToName = new Map<string, string>();
+
+    names.forEach((name, i) => {
+      const code = i < CODES.length ? CODES[i] : `X${i}`;
+      nameToCode.set(name, code);
+      codeToName.set(code, name);
+    });
+
+    return { nameToCode, codeToName };
   }
 
   /**

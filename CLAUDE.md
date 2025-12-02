@@ -39,6 +39,7 @@ Optional feature for multi-voice audiobooks using LLM-based character detection:
 - **LLMVoiceService**: Two-pass LLM system using OpenAI-compatible API:
   - Pass 1: Extracts characters from text (sequential processing, detects gender/name variations)
   - Pass 2: Assigns speakers to sentences (parallel, up to 20 concurrent requests)
+  - Uses sparse output format with character codes (A-Z, 0-9, a-z) for ~95% token reduction
   - Infinite retry with exponential backoff (1s → 10min delays)
 - **VoiceAssigner**: Assigns unique voices to characters based on detected gender, avoiding duplicates.
 - **VoicePoolBuilder**: Builds voice pools filtered by locale/gender (ru-*, en-*, multilingual voices).
