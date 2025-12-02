@@ -60,6 +60,7 @@ export const isProcessing = signal<boolean>(false);
 export const statusLines = signal<string[]>([]);
 export const processedCount = signal<number>(0);
 export const totalCount = signal<number>(0);
+export const conversionStartTime = signal<number>(Date.now());
 
 // TTS Workers State
 export const activeWorkers = signal<TTSWorker[]>([]);
@@ -118,12 +119,22 @@ export function loadSettings(): void {
   loadLLMSettingsInternal();
 }
 
+function formatElapsedTime(startTime: number): string {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const hours = Math.floor(elapsed / 3600);
+  const minutes = Math.floor((elapsed % 3600) / 60);
+  const seconds = elapsed % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export function addStatusLine(message: string): void {
-  statusLines.value = [...statusLines.value, message];
+  const timestamp = formatElapsedTime(conversionStartTime.value);
+  statusLines.value = [...statusLines.value, `[${timestamp}] ${message}`];
 }
 
 export function clearStatus(): void {
   statusLines.value = [];
   processedCount.value = 0;
   totalCount.value = 0;
+  conversionStartTime.value = Date.now();
 }
