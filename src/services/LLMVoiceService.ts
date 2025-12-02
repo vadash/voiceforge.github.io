@@ -188,6 +188,8 @@ Extract all speaking characters from the provided text block.
 4. Ignore the narrator - only extract characters who speak dialogue
 5. Attribution phrases like "said John" or "he replied" indicate the speaker
 6. Inner thoughts without quotes are NOT dialogue - ignore them
+7. Dialogue often continues across sentences without re-attribution - detect conversational flow
+8. Inner monologue (character's unspoken thoughts) differs from spoken dialogue - note if detectable
 </rules>
 
 <example>
@@ -247,6 +249,9 @@ For each numbered sentence, identify who is speaking.
 3. When a sentence has BOTH dialogue AND attribution ("Hello!" she said.), the CHARACTER speaks it
 4. Every sentence needs exactly one speaker
 5. When unsure, use "narrator"
+6. Dialogue continuation: if a character speaks and next sentence is also dialogue with no new attribution, same speaker continues
+7. Pronouns in attribution ("she said", "he replied") refer to the most recently named character of matching gender
+8. Exclamations/thoughts without quotes (e.g., "Shit!" or "Well, thank the Gods") = narrator unless clearly dialogue
 </rules>
 
 <characters>
