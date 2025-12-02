@@ -1,146 +1,214 @@
-# LLM-Based Voice Assignment System
+# LLM-Based Voice Assignment System - Implementation Plan
 
-Replace heuristic-based `GenderInference.ts` and `DialogueParser.ts` with LLM-powered speaker detection.
+## Overview
 
-## Architecture (Two-Pass)
+Replace heuristic-based `GenderInference.ts` and `DialogueParser.ts` with LLM-powered two-pass speaker detection.
+
+## Clarified Requirements
+
+- **No LLM configured**: Block conversion, show error requiring LLM setup
+- **Character review UI**: Inline panel in main UI after Pass 1
+- **Retry logic**: Infinite retries with exponential backoff (1s→3s→5s, max 10min between)
+- **Voice pool filter**: `ru-*`, `en-*`, and voices with explicit "multilingual" tag
+- **Voice assignment**: LLM extracts characters+gender, VoiceAssigner picks actual voice IDs
+- **After review**: Auto-continue to Pass 2 + TTS (single "Continue" click)
+- **Cancel behavior**: Staged - cancel during Pass 1 discards all; cancel during Pass 2/TTS keeps character data
+- **Progress signals**: New LLM-specific signals (`llmCurrentBlock`, `llmTotalBlocks`, etc.)
+- **Settings UI**: Separate `LLMSettingsPanel` component mounted in `SettingsPanel`
+
+## Architecture
 
 ```
 Pass 1 (Sequential):
-  Text → Blocks → LLM extracts character names → Consolidate variations → Assign voices
+  Text → Blocks (~16k tokens) → LLM extracts characters → Merge variations → VoiceAssigner assigns voices
 
-Pass 2 (Parallel, up to 20 concurrent):
-  Blocks + CharacterMap → LLM assigns speaker per sentence → Validation → JSONL Assembly
+[User Review Step - Inline Panel]
 
-Then:
-  JSONL → TTS Pool → Merge → Save
+Pass 2 (Parallel, 20 concurrent):
+  Blocks (~8k tokens) + CharacterMap → LLM assigns speaker per sentence → Validation → JSONL
+
+TTS:
+  JSONL → TTSWorkerPool → AudioMerger → Save
 ```
 
-### Why Two-Pass?
-- **Pass 1**: Must be sequential to collect ALL character names before assigning voices
-- **Pass 2**: Can be parallel (20 concurrent) since character→voice mapping is fixed
-- Handles name variations (e.g., "Lily", "Lil", "Miss Thompson" → same person)
+## Implementation Phases
 
-## Key Design Decisions
+### Phase 1: State & Types
 
-### Token Management
-- **Pass 1 blocks**: ~16k tokens (character extraction has small output)
-- **Pass 2 blocks**: ~8k tokens (speaker assignment outputs per sentence)
-- **Unit**: Sentences (each sentence gets voice assignment)
-
-### User Review Step
-- After Pass 1 completes, show detected characters to user
-- User can edit: character names, merge characters, change gender, assign specific voices
-- User clicks "Continue" to proceed to Pass 2
-
-### Voice Continuity (solved by two-pass)
-- Pass 1 extracts ALL character names across entire text
-- LLM groups name variations (e.g., "Lily" / "Lil" / "Miss Thompson" = same character)
-- Voices assigned once per character group
-- Pass 2 uses fixed character→voice mapping
-
-### Attribution Rule
-- Dialogue attribution like "Lily said" uses **narrator voice**, not character voice
-- Only actual spoken dialogue gets character voice
-
-### Voice Pool Filter
-- Include only: `ru-*`, `en-*`, and multilingual voices
-- Filter in `VoicePoolBuilder` or create new filtered list
-
-### API Configuration
-- **Storage**: localStorage (plain text)
-- **Settings**: API key, API URL, model name
-- **Default URL**: configurable (OpenAI-compatible)
-
-## New Files
-
-### 1. `src/state/llmState.ts`
+**File: `src/state/llmState.ts`** (NEW)
 ```typescript
-// Signals
+// Settings (persisted to localStorage)
 llmApiKey: signal<string>
 llmApiUrl: signal<string>  // default: 'https://api.openai.com/v1'
 llmModel: signal<string>   // default: 'gpt-4o-mini'
 llmEnabled: signal<boolean>
-llmProcessingStatus: signal<'idle' | 'processing' | 'error'>
+
+// Processing status
+llmProcessingStatus: signal<'idle' | 'pass1' | 'review' | 'pass2' | 'error'>
 llmCurrentBlock: signal<number>
 llmTotalBlocks: signal<number>
 llmError: signal<string | null>
 
-// Persistence functions
-saveLLMSettings()
-loadLLMSettings()
+// Character data (persisted between Pass 1 and Pass 2)
+detectedCharacters: signal<Character[]>
+characterVoiceMap: signal<Map<string, string>>
+
+// Functions
+saveLLMSettings(), loadLLMSettings(), resetLLMState()
 ```
 
-### 2. `src/services/TextBlockSplitter.ts`
+**File: `src/state/types.ts`** (MODIFY)
 ```typescript
-interface TextBlock {
-  blockIndex: number;
-  sentences: string[];       // Sentences in this block
-  sentenceStartIndex: number; // Global sentence index of first sentence
+// Add interfaces
+interface Character {
+  canonicalName: string;
+  variations: string[];
+  gender: 'male' | 'female' | 'unknown';
+  voiceId?: string;
 }
 
+interface TextBlock {
+  blockIndex: number;
+  sentences: string[];
+  sentenceStartIndex: number;
+}
+
+interface Pass1Response {
+  characters: Character[];
+}
+
+interface Pass2Response {
+  sentences: { index: number; speaker: string }[];
+}
+
+interface SpeakerAssignment {
+  sentenceIndex: number;
+  text: string;
+  speaker: string;
+  voiceId: string;
+}
+```
+
+### Phase 2: Core Services
+
+**File: `src/services/TextBlockSplitter.ts`** (NEW)
+```typescript
 class TextBlockSplitter {
   splitIntoSentences(text: string): string[];
   splitIntoBlocks(sentences: string[], maxTokens: number): TextBlock[];
-  estimateTokens(text: string): number;  // chars / 4 approximation
+  estimateTokens(text: string): number;  // chars / 4
 }
 ```
 
-### 3. `src/services/LLMVoiceService.ts`
+**File: `src/services/LLMVoiceService.ts`** (NEW)
 ```typescript
 class LLMVoiceService {
   constructor(options: { apiKey, apiUrl, model, narratorVoice })
 
-  // Pass 1: Extract characters (sequential)
-  async extractCharacters(blocks: TextBlock[]): Promise<CharacterMap>
+  // Pass 1: Sequential character extraction
+  async extractCharacters(blocks: TextBlock[], onProgress: (current, total) => void): Promise<Character[]>
 
-  // Pass 2: Assign speakers (parallel, up to 20 concurrent)
-  async assignSpeakers(blocks: TextBlock[], characterMap: CharacterMap): Promise<SpeakerAssignment[]>
+  // Pass 2: Parallel speaker assignment (20 concurrent)
+  async assignSpeakers(blocks: TextBlock[], characterMap: Map<string, string>, onProgress): Promise<SpeakerAssignment[]>
 
-  // Full pipeline
-  async analyzeText(text: string): Promise<FullAnalysisResult>
-
+  // Internal
   private async *streamCompletion(messages): AsyncGenerator<string>
   private validatePass1Response(response): ValidationResult
-  private validatePass2Response(response, block): ValidationResult
+  private validatePass2Response(response, block, characterMap): ValidationResult
+  private mergeCharacters(blockResults: Pass1Response[]): Character[]
+  private buildPrompt(type: 'pass1' | 'pass2', context): { system: string, user: string }
 }
 ```
 
-### 4. `src/components/Settings/LLMSettingsPanel.tsx`
-- Toggle: Enable LLM
-- Input: API Key (password field)
-- Input: API URL
+**File: `src/services/VoicePoolBuilder.ts`** (MODIFY)
+- Add `buildFilteredPool()` that returns only `ru-*`, `en-*`, and `*multilingual*` voices
+
+**File: `src/services/VoiceAssigner.ts`** (MODIFY)
+- Add `assignVoicesFromLLMCharacters(characters: Character[]): Map<string, string>`
+- Keep existing logic for gender-based voice selection
+
+### Phase 3: UI Components
+
+**File: `src/components/Settings/LLMSettingsPanel.tsx`** (NEW)
+- Toggle: Enable LLM mode
+- Input: API Key (password field, masked)
+- Input: API URL (with default)
 - Input: Model name
 - Button: Test Connection
-- Button: Save
+- Status indicator
 
-### 5. `src/components/CharacterReviewPanel.tsx` (NEW)
-- Shows after Pass 1 completes
-- Table/list of detected characters:
-  - Character name (editable)
-  - Variations (editable list)
+**File: `src/components/CharacterReviewPanel.tsx`** (NEW)
+- Shown inline when `llmProcessingStatus === 'review'`
+- Table of detected characters:
+  - Character name (editable text input)
+  - Variations (editable comma-separated or tags)
   - Gender (dropdown: male/female/unknown)
-  - Assigned voice (dropdown from voice pool)
-- Merge button: combine two characters
-- Delete button: remove character
-- "Continue to TTS" button: proceeds to Pass 2
+  - Assigned voice (dropdown from filtered voice pool)
+- Actions:
+  - Merge: Select two characters → combine into one
+  - Delete: Remove character (sentences reassigned to narrator)
+  - Add: Manually add a character
+- "Continue to TTS" button → triggers Pass 2 + TTS
 
-## Prompt Structure
+**File: `src/components/Settings/SettingsPanel.tsx`** (MODIFY)
+- Import and render `<LLMSettingsPanel />` in a collapsible section
+
+### Phase 4: Integration
+
+**File: `src/services/TextProcessor.ts`** (MODIFY)
+- Add `async processWithLLM(llmService: LLMVoiceService): Promise<ProcessedBookWithVoices>`
+- This replaces `processWithVoices()` flow when LLM enabled
+- Returns after Pass 1 with characters for review
+
+**File: `src/hooks/useTTSConversion.ts`** (MODIFY)
+- Check `llmEnabled` signal at start
+- If enabled but no API key: show error, block conversion
+- New flow:
+  1. Create `LLMVoiceService` instance
+  2. Run Pass 1 (character extraction)
+  3. Set `llmProcessingStatus = 'review'`, wait for user
+  4. User edits characters in `CharacterReviewPanel`, clicks Continue
+  5. Run Pass 2 (speaker assignment)
+  6. Convert to TTS tasks with voice-per-sentence
+  7. Run TTSWorkerPool as before
+
+**File: `src/state/appState.ts`** (MODIFY)
+- Import and re-export from `llmState.ts`
+- Add LLM settings to persistence
+
+### Phase 5: Cleanup
+
+**Delete files:**
+- `src/services/GenderInference.ts`
+- `src/services/DialogueParser.ts`
+
+**Remove references in:**
+- `src/services/TextProcessor.ts`
+- Any imports of deleted files
+
+## Prompt Templates
 
 ### Pass 1: Character Extraction
 
-**System prompt:**
-```
+```markdown
+<role>
 You are a character extractor for audiobook production.
+</role>
 
-TASK: Extract all speaking characters from the text.
+<task>
+Extract all speaking characters from the provided text block.
+</task>
 
-RULES:
-1. Identify every character who speaks dialogue
-2. Group name variations (e.g., "Lily", "Lil", "Miss Thompson" = same person)
-3. Detect gender: "male", "female", "unknown"
-4. Ignore the narrator (not a character)
+<rules>
+1. Identify every character who speaks dialogue (quoted or indicated by speech marks)
+2. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
+3. Detect gender: "male", "female", or "unknown"
+4. Ignore the narrator - they are not a character
+5. Attribution phrases like "said John" indicate John is speaking the preceding dialogue
+</rules>
 
-OUTPUT FORMAT (JSON only):
+<output_format>
+Respond with ONLY valid JSON:
 {
   "characters": [
     {
@@ -150,44 +218,37 @@ OUTPUT FORMAT (JSON only):
     }
   ]
 }
-```
+</output_format>
 
-**User prompt:**
-```
-Extract characters from this text block:
+<text>
 ${textBlock}
+</text>
 ```
 
-After all blocks: Merge character lists, dedupe, assign voices from pool.
+### Pass 2: Speaker Assignment
 
-### Character Merging Logic (after Pass 1)
-```typescript
-function mergeCharacters(blockResults: Pass1Response[]): Character[] {
-  // 1. Collect all characters from all blocks
-  // 2. Merge by canonicalName (case-insensitive)
-  // 3. Union all variations
-  // 4. Resolve gender conflicts (prefer non-unknown)
-  // 5. Use VoiceAssigner to assign voices
-}
-```
+```markdown
+<role>
+You are a dialogue tagger for text-to-speech production.
+</role>
 
-### Pass 2: Speaker Assignment (parallel)
+<task>
+For each numbered sentence, identify who is speaking.
+</task>
 
-**System prompt:**
-```
-You are a dialogue tagger for text-to-speech.
-
-TASK: For each sentence, identify the speaker.
-
-RULES:
-1. Use "narrator" for: descriptions, narrative, attribution tags ("she said")
-2. Use character name for: actual spoken dialogue only
+<rules>
+1. Use "narrator" for: descriptions, narrative prose, attribution tags ("she said", "he replied")
+2. Use the character's canonical name for: actual spoken dialogue only
 3. Every sentence must have exactly one speaker
+4. When in doubt, use "narrator"
+</rules>
 
-CHARACTER → VOICE MAPPING:
-${characterVoiceMap}
+<characters>
+${characterList with canonical names}
+</characters>
 
-OUTPUT FORMAT (JSON only):
+<output_format>
+Respond with ONLY valid JSON:
 {
   "sentences": [
     {"index": 0, "speaker": "narrator"},
@@ -195,115 +256,49 @@ OUTPUT FORMAT (JSON only):
     ...
   ]
 }
-```
+</output_format>
 
-**User prompt:**
-```
-Tag speakers for sentences ${startIndex}-${endIndex}:
+<sentences>
 ${numberedSentences}
+</sentences>
 ```
 
-## Validation
+## Validation Rules
 
-### Pass 1 Validation (Character Extraction)
-```typescript
-function validatePass1(response): ValidationResult {
-  // 1. JSON parses correctly
-  // 2. Has "characters" array
-  // 3. Each character has canonicalName, variations, gender
-  // 4. No duplicate canonicalNames
-}
-```
+**Pass 1:**
+1. JSON parses correctly
+2. Has `characters` array
+3. Each character has `canonicalName`, `variations` (array), `gender`
+4. `gender` is one of: "male", "female", "unknown"
 
-### Pass 2 Validation (Speaker Assignment)
-```typescript
-function validatePass2(response, block, characterMap): ValidationResult {
-  // 1. JSON parses correctly
-  // 2. Sentence count matches: response.sentences.length === block.sentences.length
-  // 3. All speakers are either "narrator" or exist in characterMap
-  // 4. Narrator appears in result (should be most common)
-}
-```
-
-## SSE Streaming
-
-```typescript
-async *streamCompletion(messages) {
-  const response = await fetch(`${apiUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages, stream: true, max_tokens: 1000 })
-  });
-
-  const reader = response.body.getReader();
-  // Parse SSE: "data: {...}" lines
-  // Yield content chunks
-  // Handle "data: [DONE]"
-}
-```
+**Pass 2:**
+1. JSON parses correctly
+2. `sentences.length === block.sentences.length`
+3. All speakers are either "narrator" or exist in character map
+4. Indices are sequential starting from block's `sentenceStartIndex`
 
 ## Error Handling
 
-- **Retry**: Infinity attempts with exponential backoff (1s, 3s, 5s, max 10 minutes)
-- **On validation fail**: Include errors in retry prompt
-- **On final fail**: Block conversion, show error to user
-- **No fallback**: Old heuristic system removed entirely
+- **Validation failure**: Retry with error details in prompt
+- **API error**: Exponential backoff (1s, 3s, 5s, ... max 10min), infinite retries
+- **User cancel during Pass 1**: Discard all, reset state
+- **User cancel during Pass 2/TTS**: Keep character data in state
 
-## Files to Modify
+## Files Summary
 
-1. **`src/state/types.ts`** - Add LLM interfaces
-2. **`src/state/appState.ts`** - Import LLM state, add to persistence
-3. **`src/services/TextProcessor.ts`** - Add async `processWithLLM()` path
-4. **`src/hooks/useTTSConversion.ts`** - Handle async LLM step, block on error
-5. **`src/components/Settings/SettingsPanel.tsx`** - Include LLMSettingsPanel
-
-## Files to Delete
-
-1. `src/services/GenderInference.ts` - Replaced by LLM
-2. `src/services/DialogueParser.ts` - Replaced by LLM
-
-## Files to Keep (refactor)
-
-1. **`src/services/VoiceAssigner.ts`** - Still useful! After Pass 1 extracts characters+gender, VoiceAssigner assigns voices from pool. Just change input format.
-
-## Implementation Phases
-
-**Phase 1: State & Types**
-- Create `llmState.ts`
-- Add types to `types.ts`
-
-**Phase 2: Core Services**
-- Create `TextBlockSplitter.ts`
-- Create `LLMVoiceService.ts`
-
-**Phase 3: UI**
-- Create `LLMSettingsPanel.tsx`
-- Create `CharacterReviewPanel.tsx`
-- Modify `SettingsPanel.tsx`
-
-**Phase 4: Integration**
-- Modify `TextProcessor.ts` - add async LLM path
-- Modify `useTTSConversion.ts` - handle two-pass flow with review step
-- Modify `appState.ts` - import LLM state, persistence
-- Modify `VoiceAssigner.ts` - accept LLM character format
-
-**Phase 5: Cleanup**
-- Delete `GenderInference.ts`
-- Delete `DialogueParser.ts`
-- Remove all references to deleted files
-
-## Output Format (JSONL-like)
-
-Final assembly before TTS:
-```typescript
-interface TTSTask {
-  lineIndex: number;
-  text: string;
-  voiceId: string;
-  speaker: string;
-}
-```
-
-## More notes from user
-
-When assemple prompt to LLm use markdown + XML structure. You know the drill. Add 1) role, 2) rules, 3) examples? (not sure if needed), 4) output format and anything else sections u need
+| Action | File |
+|--------|------|
+| CREATE | `src/state/llmState.ts` |
+| CREATE | `src/services/TextBlockSplitter.ts` |
+| CREATE | `src/services/LLMVoiceService.ts` |
+| CREATE | `src/components/Settings/LLMSettingsPanel.tsx` |
+| CREATE | `src/components/CharacterReviewPanel.tsx` |
+| MODIFY | `src/state/types.ts` |
+| MODIFY | `src/state/appState.ts` |
+| MODIFY | `src/services/VoicePoolBuilder.ts` |
+| MODIFY | `src/services/VoiceAssigner.ts` |
+| MODIFY | `src/services/TextProcessor.ts` |
+| MODIFY | `src/hooks/useTTSConversion.ts` |
+| MODIFY | `src/components/Settings/SettingsPanel.tsx` |
+| DELETE | `src/services/GenderInference.ts` |
+| DELETE | `src/services/DialogueParser.ts` |
