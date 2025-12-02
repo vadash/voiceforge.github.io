@@ -1,0 +1,45 @@
+{
+  "app": {
+    "title": "Edge TTS"
+  },
+  "settings": {
+    "toggle": "Settings",
+    "voice": "Voice",
+    "rate": "Speed",
+    "pitch": "Pitch",
+    "threads": "Threads",
+    "merge": "Merge files",
+    "mergeAll": "ALL",
+    "points": {
+      "label": "Point replacement",
+      "none": "Don't replace points",
+      "space": "Space",
+      "newline": "New line",
+      "doubleNewline": "Double newline"
+    },
+    "pointsType": {
+      "v1": "V1",
+      "v2": "V2",
+      "v3": "V3"
+    },
+    "dictionary": {
+      "label": "Dictionary register",
+      "caseSensitive": "Case sensitive"
+    }
+  },
+  "files": {
+    "dictionary": "Dictionary",
+    "upload": "Upload file",
+    "formats": "txt, fb2, epub, ini, zip"
+  },
+  "convert": {
+    "button": "Save to MP3",
+    "selectFolder": "Select folder to save"
+  },
+  "status": {
+    "ready": "Ready",
+    "processing": "Processing...",
+    "completed": "Completed",
+    "error": "Error"
+  }
+}

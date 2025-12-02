@@ -1,0 +1,265 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg-primary);
+  font-family: var(--font-family);
+  font-size: 1.2rem;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+#root {
+  display: flex;
+  min-height: 100vh;
+  padding: 5%;
+}
+
+/* App layout */
+.app {
+  display: flex;
+  width: 100%;
+  gap: 1rem;
+}
+
+.app.lite {
+  justify-content: center;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  max-width: 20rem;
+}
+
+.app.lite .controls {
+  margin: 0 auto;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Labels */
+label {
+  color: var(--text-secondary);
+  transition: color var(--transition), text-shadow var(--transition);
+  cursor: pointer;
+}
+
+label:hover {
+  color: var(--text-primary);
+  text-shadow: 0 0 6px var(--accent-text-glow);
+}
+
+/* Buttons */
+button {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: var(--border-radius);
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+button:hover,
+button:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  background-color: var(--bg-hover);
+}
+
+/* Selects */
+select {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0.5rem;
+  color: var(--text-primary);
+  border-radius: var(--border-radius);
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+
+select:hover,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  background-color: var(--bg-hover);
+}
+
+option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+/* Textareas */
+textarea {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 1rem;
+  resize: vertical;
+  color: var(--text-primary);
+  border-radius: var(--border-radius-lg);
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+textarea:hover,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  background-color: var(--bg-hover);
+}
+
+/* Inputs */
+input {
+  width: 100%;
+}
+
+input[type="range"] {
+  border-radius: var(--border-radius);
+}
+
+input[type="file"] {
+  display: none;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  background-color: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background-color: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-track {
+  border-radius: 10px;
+  background-color: var(--bg-primary);
+}
+
+::-webkit-resizer {
+  display: none;
+}
+
+/* Toggle checkbox */
+.toggle-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.toggle {
+  appearance: none;
+  background-color: var(--bg-tertiary);
+  border-radius: 72px;
+  border-style: none;
+  flex-shrink: 0;
+  height: 20px;
+  margin: 0;
+  position: relative;
+  width: 30px;
+  cursor: pointer;
+  transition: all 100ms ease-out;
+}
+
+.toggle::after {
+  background-color: #aaa;
+  border-radius: 50%;
+  content: "";
+  height: 14px;
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  width: 14px;
+  transition: all 100ms ease-out;
+}
+
+.toggle:hover {
+  background-color: #555;
+}
+
+.toggle:checked {
+  background-color: var(--accent);
+}
+
+.toggle:checked::after {
+  background-color: var(--text-primary);
+  left: 13px;
+}
+
+.toggle:checked:hover {
+  background-color: var(--accent-hover);
+}
+
+.toggle:focus {
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  outline: none;
+}
+
+/* File handlers */
+.file-handlers {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.file-handlers label {
+  text-align: center;
+  width: 48%;
+  padding-bottom: 0.5rem;
+}
+
+.file-handlers button {
+  width: 48%;
+}
+
+/* Settings toggle button */
+.settings-toggle {
+  width: 16%;
+  min-width: 40px;
+}
+
+/* Convert button */
+.convert-btn {
+  width: 100%;
+  margin-top: 0.8rem;
+  padding: 0.75rem;
+  font-size: 1.1rem;
+}

@@ -1,0 +1,45 @@
+{
+  "app": {
+    "title": "Edge TTS"
+  },
+  "settings": {
+    "toggle": "Настройки",
+    "voice": "Голос",
+    "rate": "Скорость",
+    "pitch": "Высота",
+    "threads": "Потоков",
+    "merge": "Объединять файлов",
+    "mergeAll": "ВСЕ",
+    "points": {
+      "label": "Замена точек",
+      "none": "Не заменять точки",
+      "space": "Пробел",
+      "newline": "Новая строка",
+      "doubleNewline": "Двойная строка"
+    },
+    "pointsType": {
+      "v1": "V1",
+      "v2": "V2",
+      "v3": "V3"
+    },
+    "dictionary": {
+      "label": "Реестр словаря",
+      "caseSensitive": "Регистрозависимый"
+    }
+  },
+  "files": {
+    "dictionary": "Словарь",
+    "upload": "Загрузить файл",
+    "formats": "txt, fb2, epub, ini, zip"
+  },
+  "convert": {
+    "button": "Сохранить в MP3",
+    "selectFolder": "Выберите папку для сохранения"
+  },
+  "status": {
+    "ready": "Готово",
+    "processing": "Обработка...",
+    "completed": "Завершено",
+    "error": "Ошибка"
+  }
+}

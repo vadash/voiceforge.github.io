@@ -1,0 +1,55 @@
+/* Tablet and mobile */
+@media screen and (max-width: 1000px) {
+  #root {
+    padding: 3%;
+  }
+
+  .app {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .app .text-input {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+
+  .controls {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Mobile */
+@media screen and (max-width: 600px) {
+  body {
+    font-size: 1rem;
+  }
+
+  #root {
+    padding: 2%;
+  }
+
+  .top-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .top-row select,
+  .top-row button {
+    width: 100%;
+  }
+
+  .settings-toggle {
+    width: 100%;
+  }
+
+  .file-handlers {
+    flex-direction: column;
+  }
+
+  .file-handlers label,
+  .file-handlers button {
+    width: 100%;
+  }
+}
