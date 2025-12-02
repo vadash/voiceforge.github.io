@@ -34,10 +34,10 @@ export function FileUpload() {
   };
 
   return (
-    <div style={{ width: '48%' }}>
-      <label style={{ display: 'block', textAlign: 'center', paddingBottom: '0.5rem' }}>
+    <label>
+      <span style={{ display: 'block', textAlign: 'center', paddingBottom: '0.25rem' }}>
         <Text id="files.upload">Файл</Text>
-      </label>
+      </span>
       <input
         ref={inputRef}
         type="file"
@@ -52,6 +52,6 @@ export function FileUpload() {
       >
         📄
       </button>
-    </div>
+    </label>
   );
 }

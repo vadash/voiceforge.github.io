@@ -1,33 +1,74 @@
-/* Tablet and mobile */
+/* Tablet */
 @media screen and (max-width: 1000px) {
   #root {
-    padding: 3%;
+    padding: 1rem 2%;
   }
 
   .app {
-    flex-direction: column;
-    align-items: center;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: 1fr auto;
   }
 
-  .app .text-input {
-    width: 100%;
-    margin-bottom: 1rem;
+  .app.lite {
+    grid-template-columns: 280px 1fr;
   }
 
-  .controls {
-    width: 100%;
-    max-width: 100%;
+  .sidebar {
+    grid-row: 1 / -1;
+  }
+
+  .status-area {
+    grid-column: 2;
+    grid-row: 2;
+    max-width: none;
+    min-width: 0;
+    min-height: 150px;
+    max-height: 30vh;
+  }
+
+  .status-resizer {
+    display: none;
   }
 }
 
 /* Mobile */
-@media screen and (max-width: 600px) {
+@media screen and (max-width: 700px) {
   body {
     font-size: 1rem;
   }
 
   #root {
-    padding: 2%;
+    padding: 0.5rem;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    gap: 0.75rem;
+  }
+
+  .app.lite {
+    display: flex;
+  }
+
+  .sidebar {
+    height: auto;
+    order: 1;
+  }
+
+  .main-content {
+    order: 2;
+    min-height: 200px;
+  }
+
+  .status-area {
+    order: 3;
+    max-width: none;
+    min-width: 0;
+    min-height: 120px;
+    max-height: 200px;
   }
 
   .top-row {
@@ -43,13 +84,16 @@
   .settings-toggle {
     width: 100%;
   }
+}
 
+/* Very small mobile */
+@media screen and (max-width: 400px) {
   .file-handlers {
     flex-direction: column;
   }
 
-  .file-handlers label,
-  .file-handlers button {
-    width: 100%;
+  .file-handlers > label,
+  .file-handlers > button {
+    min-height: 44px;
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { isLiteMode, loadSettings } from './state/appState';
+import { isLiteMode, isProcessing, loadSettings } from './state/appState';
 import { TextInput } from './components/TextInput';
 import { VoiceSelector } from './components/VoiceSelector/VoiceSelector';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
@@ -16,32 +16,32 @@ export function App() {
 
   return (
     <div class={`app ${isLiteMode.value ? 'lite' : ''}`}>
-      <main class="main-content">
-        {!isLiteMode.value && <TextInput />}
-
-        <div class="controls">
-          <div class="top-row">
-            <VoiceSelector />
-            <button
-              class="settings-toggle"
-              onClick={() => isLiteMode.value = !isLiteMode.value}
-            >
-              <Text id="settings.toggle">Настройки</Text>
-            </button>
-          </div>
-
-          <SettingsPanel />
-
-          <div class="file-handlers">
-            <DictionaryUpload />
-            <FileUpload />
-          </div>
-
-          <ConvertButton />
+      <aside class="sidebar">
+        <div class="top-row">
+          <VoiceSelector />
+          <button
+            class="settings-toggle"
+            onClick={() => isLiteMode.value = !isLiteMode.value}
+          >
+            <Text id="settings.toggle">Настройки</Text>
+          </button>
         </div>
+
+        <SettingsPanel />
+
+        <div class="file-handlers">
+          <DictionaryUpload />
+          <FileUpload />
+        </div>
+
+        <ConvertButton />
+      </aside>
+
+      <main class={`main-content ${isProcessing.value ? 'hidden' : ''}`}>
+        {!isLiteMode.value && <TextInput />}
       </main>
 
-      <StatusArea />
+      {!isLiteMode.value && <StatusArea />}
     </div>
   );
 }

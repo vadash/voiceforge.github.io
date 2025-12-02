@@ -20,6 +20,7 @@ export interface AppSettings {
   lexxRegister: boolean;
   showDopSettings: boolean;
   isLiteMode: boolean;
+  statusAreaWidth: number;
 }
 
 export interface ProcessedBook {

@@ -23,13 +23,13 @@ export function DictionaryUpload() {
   };
 
   return (
-    <div style={{ width: '48%' }}>
-      <label style={{ display: 'block', textAlign: 'center', paddingBottom: '0.5rem' }}>
+    <label>
+      <span style={{ display: 'block', textAlign: 'center', paddingBottom: '0.25rem' }}>
         <Text id="files.dictionary">Словарь</Text>
         {dictionary.value.length > 0 && (
           <span style={{ color: 'var(--accent)' }}> ({dictionary.value.length})</span>
         )}
-      </label>
+      </span>
       <input
         ref={inputRef}
         type="file"
@@ -42,6 +42,6 @@ export function DictionaryUpload() {
       >
         📖
       </button>
-    </div>
+    </label>
   );
 }

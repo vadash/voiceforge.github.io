@@ -11,9 +11,9 @@ export function TextInput() {
       value={textContent.value}
       onInput={(e) => textContent.value = (e.target as HTMLTextAreaElement).value}
       style={{
-        minHeight: '55vh',
-        flexGrow: 1,
-        marginRight: '1rem',
+        flex: 1,
+        width: '100%',
+        minHeight: '200px',
       }}
     />
   );

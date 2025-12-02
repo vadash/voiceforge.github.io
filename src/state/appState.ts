@@ -47,6 +47,7 @@ export const mergeDisplay = computed(() =>
 // UI State
 export const isLiteMode = signal<boolean>(true);
 export const showDopSettings = signal<boolean>(false);
+export const statusAreaWidth = signal<number>(350);
 
 // Data State
 export const dictionary = signal<string[]>([]);
@@ -86,6 +87,7 @@ export function saveSettings(): void {
     lexxRegister: lexxRegister.value,
     showDopSettings: showDopSettings.value,
     isLiteMode: isLiteMode.value,
+    statusAreaWidth: statusAreaWidth.value,
   };
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
@@ -107,6 +109,7 @@ export function loadSettings(): void {
       lexxRegister.value = settings.lexxRegister ?? true;
       showDopSettings.value = settings.showDopSettings ?? false;
       isLiteMode.value = settings.isLiteMode ?? true;
+      statusAreaWidth.value = settings.statusAreaWidth ?? 350;
     }
   } catch (e) {
     console.error('Failed to load settings:', e);
