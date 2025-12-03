@@ -20,11 +20,12 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 
 1. **File Input** → `FileConverter` parses TXT/FB2/EPUB/ZIP files
 2. **Text Processing** → `TextProcessor` applies dictionary replacements and splits into sentences
-3. **TTS Conversion** → `TTSWorkerPool` manages concurrent `EdgeTTSService` WebSocket connections (up to 30 parallel)
+3. **TTS Conversion** → `ConversionOrchestrator` coordinates `TTSWorkerPool` and `EdgeTTSService` WebSocket connections (up to 30 parallel)
 4. **Audio Output** → `AudioMerger` combines MP3 chunks and saves/downloads
 
 ### Key Services (`src/services/`)
 
+- **ConversionOrchestrator**: Central coordinator for the entire conversion workflow using dependency injection
 - **EdgeTTSService**: WebSocket client for Edge TTS API. Sends SSML via WebSocket, receives binary audio chunks, handles reconnection on failure.
 - **TTSWorkerPool**: Queue-based worker pool with retry logic (3 retries, exponential backoff). Manages concurrent TTS requests.
 - **TextProcessor**: Applies .lexx dictionary rules (regex and word-based), handles punctuation replacement, splits text into chunks.
@@ -46,22 +47,18 @@ Optional feature for multi-voice audiobooks using LLM-based character detection:
 - **VoiceAssigner**: Assigns unique voices to characters based on detected gender, avoiding duplicates.
 - **VoicePoolBuilder**: Builds voice pools filtered by locale/gender (ru-*, en-*, multilingual voices).
 
-### State Management (`src/state/`)
+### State Management (`src/stores/`)
 
-Uses Preact Signals for reactive state.
+Modern state management using Zustand with typed stores:
 
-**appState.ts**:
-- Settings: `voice`, `rate`, `pitch`, `maxThreads`, `outputFormat`, `silenceRemovalEnabled`, `normalizationEnabled`
-- Processing: `isProcessing`, `processedCount`, `totalCount`, `statusLines`
-- FFmpeg: `ffmpegLoaded`, `ffmpegLoading`, `ffmpegError`
-- Data: `dictionary`, `textContent`, `book`
+- **SettingsStore**: Voice settings (voice, rate, pitch, maxThreads), output format (MP3/Opus), audio processing toggles (silence removal, normalization)
+- **ConversionStore**: Conversion progress (isProcessing, processedCount, totalCount), status lines, save path handle
+- **DataStore**: Dictionary, text content, book metadata
+- **LLMStore**: LLM settings (enabled, API key, URL, model), processing status, detected characters, voice mappings
+- **LogStore**: Centralized logging service
+- **LanguageStore**: UI language preferences
 
-**llmState.ts** (LLM voice assignment):
-- Settings: `llmEnabled`, `llmApiKey`, `llmApiUrl`, `llmModel`
-- Processing: `llmProcessingStatus`, `llmCurrentBlock`, `llmTotalBlocks`
-- Data: `detectedCharacters`, `characterVoiceMap`
-
-Settings persist to localStorage.
+Settings persist to localStorage via Zustand persistence middleware.
 
 ### Components Structure
 
@@ -73,10 +70,27 @@ Settings persist to localStorage.
 ### useTTSConversion Hook
 
 Main orchestration hook in `src/hooks/useTTSConversion.ts`:
-1. Creates `TextProcessor` with current settings
-2. Spawns `TTSWorkerPool` with callback handlers
-3. Queues all sentence tasks
-4. Loads FFmpeg WASM (if Opus selected), merges audio by duration (~30min)
+1. Uses dependency injection to get `ConversionOrchestrator` service
+2. Coordinates text processing, TTS conversion, and audio merging
+3. Handles FFmpeg WASM loading (if Opus selected), merges audio by duration (~30min)
+4. Provides startConversion, cancel, and selectDirectory methods
+
+### Configuration (`src/config/`)
+
+Centralized configuration system with type-safe defaults:
+- **TTS Config**: Worker limits, retry strategies, rate limits
+- **Audio Config**: Processing parameters, FFmpeg settings, silence removal thresholds
+- **LLM Config**: Token limits, concurrency settings, retry delays
+- **FFmpeg Config**: WASM version, CDN mirrors
+- **EdgeTTS API Config**: WebSocket URLs, authentication tokens
+- **Text Processing Config**: Chunk sizes, default thread counts
+
+### Dependency Injection (`src/di/`)
+
+Lightweight DI container for service management:
+- **ServiceContainer**: Registers and resolves service dependencies
+- **ServiceContext**: React context provider for accessing services in components
+- **ServiceLifecycle**: Manages singleton services (FFmpeg, logging)
 
 ### Audio Processing (FFmpeg)
 
@@ -99,4 +113,19 @@ Main orchestration hook in `src/hooks/useTTSConversion.ts`:
 word=replacement           # Word boundary match
 "exact"="replacement"      # Exact string match
 regex"pattern"="replace"   # Regex pattern
+```
+
+## Key File Structure
+
+```
+src/
+├── config/           # Centralized configuration
+├── di/              # Dependency injection system
+├── services/        # Business logic and API clients
+├── stores/          # Zustand state management
+├── hooks/           # React hooks
+├── components/      # Preact UI components
+├── state/types.ts   # Shared TypeScript types
+├── utils/           # Utility functions
+└── errors/          # Error handling
 ```
