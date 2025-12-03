@@ -16,13 +16,27 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 ### Core Flow
 
 1. **File Input** → `FileConverter` parses TXT/FB2/EPUB/ZIP files
-2. **Text Processing** → `TextProcessor` applies dictionary replacements and splits into sentences
-3. **TTS Conversion** → `ConversionOrchestrator` coordinates `TTSWorkerPool` and `EdgeTTSService` WebSocket connections (up to 30 parallel)
-4. **Audio Output** → `AudioMerger` combines MP3 chunks and saves/downloads
+2. **Pipeline** → `ConversionOrchestrator` runs 7 discrete pipeline steps:
+   - Character Extraction (LLM Pass 1)
+   - Voice Assignment
+   - Speaker Assignment (LLM Pass 2)
+   - Dictionary Processing
+   - TTS Conversion (parallel WebSocket connections)
+   - Audio Merge
+   - Save
+3. **Audio Output** → `AudioMerger` combines MP3 chunks and saves/downloads
+
+### Pipeline Architecture (`src/services/pipeline/`)
+
+The conversion pipeline uses composable steps:
+- **PipelineRunner**: Executes steps in sequence with progress tracking and cancellation
+- **PipelineContext**: Immutable context passed between steps (text, characters, voiceMap, audioMap, etc.)
+- **BasePipelineStep**: Abstract base with progress reporting and cancellation helpers
+- Each step is independently testable via factory injection
 
 ### Key Services (`src/services/`)
 
-- **ConversionOrchestrator**: Central coordinator for the entire conversion workflow using dependency injection
+- **ConversionOrchestrator**: Builds and runs the pipeline, handles progress updates to stores
 - **EdgeTTSService**: WebSocket client for Edge TTS API. Sends SSML via WebSocket, receives binary audio chunks, handles reconnection on failure.
 - **TTSWorkerPool**: Queue-based worker pool with retry logic (3 retries, exponential backoff). Manages concurrent TTS requests.
 - **TextProcessor**: Applies .lexx dictionary rules (regex and word-based), handles punctuation replacement, splits text into chunks.
@@ -66,11 +80,10 @@ Settings persist to localStorage via Zustand persistence middleware.
 
 ### useTTSConversion Hook
 
-Main orchestration hook in `src/hooks/useTTSConversion.ts`:
-1. Uses dependency injection to get `ConversionOrchestrator` service
-2. Coordinates text processing, TTS conversion, and audio merging
-3. Handles FFmpeg WASM loading (if Opus selected), merges audio by duration (~30min)
-4. Provides startConversion, cancel, and selectDirectory methods
+Main hook in `src/hooks/useTTSConversion.ts`:
+- Creates `ConversionOrchestrator` instance per conversion
+- Provides startConversion, cancel, and selectDirectory methods
+- Exposes isProcessing and progress state
 
 ### Configuration (`src/config/`)
 
@@ -155,10 +168,12 @@ src/
 ├── config/          # Centralized configuration
 ├── di/              # Dependency injection system
 ├── services/        # Business logic and API clients
+│   └── pipeline/    # Pipeline runner and steps
 ├── stores/          # Zustand state management
 ├── hooks/           # React hooks
 ├── components/      # Preact UI components
 ├── state/types.ts   # Shared TypeScript types
 ├── utils/           # Utility functions
-└── errors/          # Error handling
+├── errors/          # Error handling
+└── test/            # Test utilities and factories
 ```
