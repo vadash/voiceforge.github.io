@@ -19,6 +19,7 @@ import {
   CharacterExtractionStep,
   VoiceAssignmentStep,
   SpeakerAssignmentStep,
+  TextSanitizationStep,
   DictionaryProcessingStep,
   TTSConversionStep,
   AudioMergeStep,
@@ -172,19 +173,22 @@ export class ConversionOrchestrator {
       textBlockSplitter: this.textBlockSplitter,
     }));
 
-    // Step 4: Dictionary Processing
+    // Step 4: Text Sanitization
+    pipeline.addStep(new TextSanitizationStep());
+
+    // Step 5: Dictionary Processing
     pipeline.addStep(new DictionaryProcessingStep({
       caseSensitive: settings.lexxRegister.value,
     }));
 
-    // Step 5: TTS Conversion
+    // Step 6: TTS Conversion
     pipeline.addStep(new TTSConversionStep({
       maxWorkers: settings.maxThreads.value,
       ttsConfig: this.buildTTSConfig(),
       createWorkerPool: (options) => this.workerPoolFactory.create(options),
     }));
 
-    // Step 6: Audio Merge
+    // Step 7: Audio Merge
     pipeline.addStep(new AudioMergeStep({
       outputFormat: settings.outputFormat.value,
       silenceRemoval: settings.silenceRemovalEnabled.value,
@@ -193,7 +197,7 @@ export class ConversionOrchestrator {
       createAudioMerger: (config) => this.audioMergerFactory.create(config),
     }));
 
-    // Step 7: Save
+    // Step 8: Save
     pipeline.addStep(new SaveStep({
       createAudioMerger: (config) => this.audioMergerFactory.create(config),
     }));
@@ -223,6 +227,10 @@ export class ConversionOrchestrator {
         this.stores.conversion.setStatus('llm-pass2');
         this.stores.llm.setProcessingStatus('pass2');
         this.stores.llm.setBlockProgress(progress.current, progress.total);
+        break;
+
+      case 'text-sanitization':
+        // Short step, no special status
         break;
 
       case 'dictionary-processing':

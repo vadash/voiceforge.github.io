@@ -20,6 +20,11 @@ export {
 } from './SpeakerAssignmentStep';
 
 export {
+  TextSanitizationStep,
+  createTextSanitizationStep,
+} from './TextSanitizationStep';
+
+export {
   DictionaryProcessingStep,
   createDictionaryProcessingStep,
   type DictionaryProcessingStepOptions,

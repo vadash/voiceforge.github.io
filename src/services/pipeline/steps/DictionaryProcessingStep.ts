@@ -68,13 +68,6 @@ export class DictionaryProcessingStep extends BasePipelineStep {
   private applyRules(text: string, rules: string[]): string {
     let result = text;
 
-    // Sanitize special characters
-    result = result.replace(/[~|*^]/g, '-');
-    result = result.replace(/\\/g, '/');
-    result = result.replace(/&/g, ' and ');
-    result = result.replace(/</g, '(');
-    result = result.replace(/>/g, ')');
-
     // Apply each rule
     for (const rule of rules) {
       result = this.applyRule(result, rule);
