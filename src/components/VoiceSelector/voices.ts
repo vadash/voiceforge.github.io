@@ -27,6 +27,9 @@ export const voices: VoiceOption[] = [
   v('en-GB, RyanNeural', 'male'),
   v('en-GB, SoniaNeural', 'female'),
   v('en-GB, LibbyNeural', 'female'),
+  // Russian
+  v('ru-RU, DmitryNeural', 'male'),
+  v('ru-RU, SvetlanaNeural', 'female'),  
 ];
 
 export default voices;
