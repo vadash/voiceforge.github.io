@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Build & Development Commands
 
 ```bash
@@ -10,6 +6,7 @@ npm run dev          # Start dev server at http://localhost:3000
 npm run build        # Production build to dist/
 npm run type-check   # TypeScript type checking
 npm run preview      # Serve production build locally
+npm run test         # Run all tests once (Vitest)
 ```
 
 ## Architecture
@@ -41,9 +38,9 @@ Optional feature for multi-voice audiobooks using LLM-based character detection:
 - **TextBlockSplitter**: Splits text into sentences and blocks for LLM processing. Uses 16k token blocks for Pass 1, 8k for Pass 2.
 - **LLMVoiceService**: Two-pass LLM system using OpenAI-compatible API:
   - Pass 1: Extracts characters from text (sequential processing, detects gender/name variations)
-  - Pass 2: Assigns speakers to sentences (parallel, up to 20 concurrent requests)
-  - Uses sparse output format with character codes (A-Z, 0-9, a-z) for ~95% token reduction
-  - Infinite retry with exponential backoff (1s → 10min delays)
+  - Pass 2: Assigns speakers to sentences (parallel)
+  - Uses sparse output format with character codes (A-Z, 0-9, a-z) for token reduction
+  - Infinite retry with exponential backoff
 - **VoiceAssigner**: Assigns unique voices to characters based on detected gender, avoiding duplicates.
 - **VoicePoolBuilder**: Builds voice pools filtered by locale/gender (ru-*, en-*, multilingual voices).
 
@@ -62,7 +59,7 @@ Settings persist to localStorage via Zustand persistence middleware.
 
 ### Components Structure
 
-- `VoiceSelector`: 340+ voices across 80+ locales (hardcoded in `voices.ts`)
+- `VoiceSelector`: many voices across locales (hardcoded in `voices.ts`)
 - `SettingsPanel`: Rate/pitch sliders, output format (MP3/Opus), silence/normalization toggles
 - `FileHandlers`: File upload and .lexx dictionary upload
 - `ConvertButton`: Triggers conversion via `useTTSConversion` hook
@@ -94,11 +91,47 @@ Lightweight DI container for service management:
 
 ### Audio Processing (FFmpeg)
 
-- **Format**: Opus 96kbps or MP3 fallback
-- **Merge**: Duration-based (~30min ±10%), respects file boundaries
-- **Silence removal**: -40dB threshold, 0.5s start, 0.25s stop
-- **Normalization**: -18 LUFS, LRA 7, TP -1.5dB (optional)
-- **CDN loading**: jsdelivr → unpkg → cdnjs fallback chain
+- **Format**: Opus or MP3 fallback
+- **Merge**: Duration-based, respects file boundaries
+- **Silence removal**
+- **Normalization**
+- **CDN loading**
+
+## Testing
+
+The project uses **Vitest** as the test runner with **jsdom** environment for DOM testing.
+
+### Test Setup (`src/test/setup.ts`)
+
+Comprehensive test environment with mocked browser APIs:
+- **localStorage/IndexedDB**: Full mock implementation for storage testing
+- **WebSocket**: Mocked WebSocket class for TTS service testing
+- **Audio API**: Mocked Audio class and audio-related APIs
+- **Browser APIs**: Mocked ResizeObserver, IntersectionObserver, clipboard APIs
+- **File APIs**: Mocked URL.createObjectURL/revokeObjectURL for blob handling
+
+### Test Configuration (`vitest.config.ts`)
+
+- **Environment**: jsdom with Preact aliases (react/preact → preact/compat)
+- **Path Resolution**: `@/` alias maps to `src/`
+- **Coverage**: V8 provider with text, HTML, and LCOV reporters
+- **Test Files**: `src/**/*.test.ts` and `src/**/*.test.tsx`
+- **Exclusions**: Test files, setup files, and entry point excluded from coverage
+
+### Testing Dependencies
+
+- **@testing-library/preact**: Preact testing utilities
+- **jsdom**: DOM environment for testing
+- **@vitest/coverage-v8**: Coverage reporting
+
+## TypeScript Configuration
+
+- **Target**: ES2020 with ESNext modules
+- **JSX**: React JSX with Preact as import source
+- **Strict Mode**: Enabled with all strict type checking options
+- **Path Aliases**: `@/*` maps to `src/*`
+- **Output**: Declarations and source maps to `dist/`
+- **Module Resolution**: Node with ES2021 lib support
 
 ## Build Configuration
 
@@ -119,7 +152,7 @@ regex"pattern"="replace"   # Regex pattern
 
 ```
 src/
-├── config/           # Centralized configuration
+├── config/          # Centralized configuration
 ├── di/              # Dependency injection system
 ├── services/        # Business logic and API clients
 ├── stores/          # Zustand state management
