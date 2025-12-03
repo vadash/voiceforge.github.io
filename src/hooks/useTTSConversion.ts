@@ -6,6 +6,7 @@ import { AudioMerger } from '../services/AudioMerger';
 import { LLMVoiceService } from '../services/LLMVoiceService';
 import { TextBlockSplitter } from '../services/TextBlockSplitter';
 import { VoiceAssigner } from '../services/VoiceAssigner';
+import { ffmpegService } from '../services/FFmpegService';
 import type { TTSConfig, ProcessedBook, SpeakerAssignment } from '../state/types';
 import {
   voice,
@@ -13,7 +14,6 @@ import {
   rate,
   pitch,
   maxThreads,
-  mergeFiles,
   dictionary,
   lexxRegister,
   isProcessing,
@@ -22,6 +22,13 @@ import {
   addStatusLine,
   clearStatus,
   savePathHandle,
+  // Audio processing state
+  outputFormat,
+  silenceRemovalEnabled,
+  normalizationEnabled,
+  ffmpegLoaded,
+  ffmpegLoading,
+  ffmpegError,
   // LLM state
   llmApiKey,
   llmApiUrl,
@@ -288,11 +295,39 @@ export function useTTSConversion() {
         processedCount.value++;
       },
       onAllComplete: async () => {
+        // Load FFmpeg if using Opus format
+        if (outputFormat.value === 'opus') {
+          ffmpegLoading.value = true;
+          ffmpegError.value = null;
+          addStatusLine('Loading FFmpeg for Opus encoding...');
+
+          const loaded = await ffmpegService.load((msg) => addStatusLine(msg));
+          ffmpegLoading.value = false;
+          ffmpegLoaded.value = loaded;
+
+          if (!loaded) {
+            ffmpegError.value = ffmpegService.getLoadError();
+            addStatusLine('FFmpeg not available, falling back to MP3 output');
+          }
+        }
+
         addStatusLine('Merging audio files...');
 
         try {
-          const merger = new AudioMerger(mergeFiles.value);
-          const mergedFiles = merger.merge(audioMap, chunks.length, fileNames);
+          const merger = new AudioMerger({
+            outputFormat: ffmpegLoaded.value ? outputFormat.value : 'mp3',
+            silenceRemoval: silenceRemovalEnabled.value,
+            normalization: normalizationEnabled.value,
+          });
+
+          const mergedFiles = await merger.merge(
+            audioMap,
+            chunks.length,
+            fileNames,
+            (current, total, message) => {
+              addStatusLine(message);
+            }
+          );
 
           if (mergedFiles.length === 0) {
             addStatusLine('No audio files to merge');

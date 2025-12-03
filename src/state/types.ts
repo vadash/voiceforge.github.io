@@ -14,13 +14,16 @@ export interface AppSettings {
   rate: number;
   pitch: number;
   maxThreads: number;
-  mergeFiles: number;
   pointsSelect: string;
   pointsType: 'V1' | 'V2' | 'V3';
   lexxRegister: boolean;
   showDopSettings: boolean;
   isLiteMode: boolean;
   statusAreaWidth: number;
+  // Audio processing settings
+  outputFormat: 'mp3' | 'opus';
+  silenceRemovalEnabled: boolean;
+  normalizationEnabled: boolean;
 }
 
 export interface ProcessedBook {

@@ -28,10 +28,19 @@ export const voicePoolLocale = signal<string>('ru-RU');
 export const rate = signal<number>(0);
 export const pitch = signal<number>(0);
 export const maxThreads = signal<number>(20);
-export const mergeFiles = signal<number>(10);
 export const pointsSelect = signal<string>('none');
 export const pointsType = signal<'V1' | 'V2' | 'V3'>('V1');
 export const lexxRegister = signal<boolean>(true);
+
+// Audio Processing Settings
+export const outputFormat = signal<'mp3' | 'opus'>('opus');
+export const silenceRemovalEnabled = signal<boolean>(true);
+export const normalizationEnabled = signal<boolean>(false);
+
+// FFmpeg State
+export const ffmpegLoaded = signal<boolean>(false);
+export const ffmpegLoading = signal<boolean>(false);
+export const ffmpegError = signal<string | null>(null);
 
 // Computed display values
 export const rateDisplay = computed(() =>
@@ -39,9 +48,6 @@ export const rateDisplay = computed(() =>
 );
 export const pitchDisplay = computed(() =>
   pitch.value >= 0 ? `+${pitch.value}Hz` : `${pitch.value}Hz`
-);
-export const mergeDisplay = computed(() =>
-  mergeFiles.value >= 100 ? 'ALL' : `${mergeFiles.value}`
 );
 
 // UI State
@@ -82,13 +88,15 @@ export function saveSettings(): void {
     rate: rate.value,
     pitch: pitch.value,
     maxThreads: maxThreads.value,
-    mergeFiles: mergeFiles.value,
     pointsSelect: pointsSelect.value,
     pointsType: pointsType.value,
     lexxRegister: lexxRegister.value,
     showDopSettings: showDopSettings.value,
     isLiteMode: isLiteMode.value,
     statusAreaWidth: statusAreaWidth.value,
+    outputFormat: outputFormat.value,
+    silenceRemovalEnabled: silenceRemovalEnabled.value,
+    normalizationEnabled: normalizationEnabled.value,
   };
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
@@ -104,13 +112,15 @@ export async function loadSettings(): Promise<void> {
       rate.value = settings.rate ?? 0;
       pitch.value = settings.pitch ?? 0;
       maxThreads.value = settings.maxThreads ?? 20;
-      mergeFiles.value = settings.mergeFiles ?? 10;
       pointsSelect.value = settings.pointsSelect ?? 'none';
       pointsType.value = settings.pointsType ?? 'V1';
       lexxRegister.value = settings.lexxRegister ?? true;
       showDopSettings.value = settings.showDopSettings ?? false;
       isLiteMode.value = settings.isLiteMode ?? true;
       statusAreaWidth.value = settings.statusAreaWidth ?? 450;
+      outputFormat.value = settings.outputFormat ?? 'opus';
+      silenceRemovalEnabled.value = settings.silenceRemovalEnabled ?? true;
+      normalizationEnabled.value = settings.normalizationEnabled ?? false;
     }
   } catch (e) {
     console.error('Failed to load settings:', e);

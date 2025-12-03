@@ -17,3 +17,39 @@ export const TEXT_PROCESSING = {
 // Windows epoch for Sec-MS-GEC generation
 export const WIN_EPOCH = 11644473600;
 export const S_TO_NS = 1e9;
+
+// FFmpeg WASM Configuration
+export const FFMPEG_CONFIG = {
+  VERSION: '0.12.10',
+  CDN_MIRRORS: [
+    'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd',
+    'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd',
+    'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd',
+  ],
+};
+
+// Audio Processing Settings
+export const AUDIO_PROCESSING = {
+  // Duration-based merge (replaces count-based)
+  TARGET_DURATION_MINUTES: 30,
+  TOLERANCE_PERCENT: 10,
+  // Edge TTS output: 96kbps = 12 bytes/ms
+  BYTES_PER_MS: 12,
+
+  // Opus encoding
+  OPUS_BITRATE: 96,
+  OPUS_COMPRESSION: 10,
+  SAMPLE_RATE: 24000,
+
+  // Normalization (EBU R128 modified)
+  NORM_LUFS: -18,
+  NORM_LRA: 7,
+  NORM_TP: -1.5,
+
+  // Silence removal
+  SILENCE_THRESHOLD: -40,
+  SILENCE_START_PERIODS: 1,
+  SILENCE_START_DURATION: 0.5,
+  SILENCE_STOP_PERIODS: -1,
+  SILENCE_STOP_DURATION: 0.25,
+};

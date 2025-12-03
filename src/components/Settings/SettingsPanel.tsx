@@ -1,8 +1,10 @@
 import { Text } from 'preact-i18n';
 import {
-  rate, pitch, maxThreads, mergeFiles,
-  rateDisplay, pitchDisplay, mergeDisplay,
+  rate, pitch, maxThreads,
+  rateDisplay, pitchDisplay,
   showDopSettings, lexxRegister,
+  outputFormat, silenceRemovalEnabled, normalizationEnabled,
+  ffmpegError,
   saveSettings, saveLLMSettings
 } from '../../state/appState';
 import { Slider } from './Slider';
@@ -56,14 +58,47 @@ export function SettingsPanel() {
             onChange={(v) => maxThreads.value = v}
           />
 
-          <Slider
-            label={<Text id="settings.merge">Merge</Text>}
-            value={mergeFiles.value}
-            min={1}
-            max={100}
-            display={mergeDisplay.value}
-            onChange={(v) => mergeFiles.value = v}
-          />
+          <label class="toggle-wrapper">
+            <span><Text id="settings.outputFormat">Output Format</Text></span>
+            <select
+              value={outputFormat.value}
+              onChange={(e) => outputFormat.value = (e.target as HTMLSelectElement).value as 'mp3' | 'opus'}
+              style={{ marginLeft: 'auto', padding: '0.25rem' }}
+            >
+              <option value="opus">Opus</option>
+              <option value="mp3">MP3</option>
+            </select>
+          </label>
+
+          {outputFormat.value === 'opus' && (
+            <>
+              <label class="toggle-wrapper">
+                <span><Text id="settings.silenceRemoval">Remove Silence</Text></span>
+                <input
+                  type="checkbox"
+                  class="toggle"
+                  checked={silenceRemovalEnabled.value}
+                  onChange={(e) => silenceRemovalEnabled.value = (e.target as HTMLInputElement).checked}
+                />
+              </label>
+
+              <label class="toggle-wrapper">
+                <span><Text id="settings.normalization">Normalize Audio</Text></span>
+                <input
+                  type="checkbox"
+                  class="toggle"
+                  checked={normalizationEnabled.value}
+                  onChange={(e) => normalizationEnabled.value = (e.target as HTMLInputElement).checked}
+                />
+              </label>
+
+              {ffmpegError.value && (
+                <div style={{ color: 'var(--warning-color, #f90)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                  ⚠️ {ffmpegError.value}
+                </div>
+              )}
+            </>
+          )}
 
           <label class="toggle-wrapper">
             <span><Text id="settings.dictionary.caseSensitive">Dictionary case</Text></span>
