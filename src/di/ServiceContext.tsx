@@ -12,6 +12,8 @@ import { defaultConfig, type AppConfig } from '@/config';
 // not pre-registered in the container.
 import { ffmpegService } from '@/services/FFmpegService';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
+import { LoggerService } from '@/services/LoggerService';
+import type { LogStore } from '@/stores/LogStore';
 
 import type {
   ILogger,
@@ -179,14 +181,21 @@ class FFmpegServiceAdapter implements IFFmpegService {
 /**
  * Create a production service container with all real implementations
  */
-export function createProductionContainer(config: AppConfig = defaultConfig): ServiceContainer {
+export function createProductionContainer(
+  logStore?: LogStore,
+  config: AppConfig = defaultConfig
+): ServiceContainer {
   const container = createContainer();
 
   // Register configuration
   container.registerInstance(ServiceTypes.Config, config);
 
-  // Register logger (singleton)
-  container.registerSingleton(ServiceTypes.Logger, () => new ConsoleLogger());
+  // Register logger (singleton) - use LoggerService if logStore provided
+  if (logStore) {
+    container.registerSingleton(ServiceTypes.Logger, () => new LoggerService(logStore));
+  } else {
+    container.registerSingleton(ServiceTypes.Logger, () => new ConsoleLogger());
+  }
 
   // Register secure storage (singleton) - needs logger
   container.registerSingleton(ServiceTypes.SecureStorage, () => {

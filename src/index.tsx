@@ -18,7 +18,7 @@ const definitions: Record<SupportedLocale, Record<string, unknown>> = { en, ru }
 
 // Create stores and container
 const stores = createStores();
-const container = createProductionContainer();
+const container = createProductionContainer(stores.logs);
 
 // Initialize app
 async function init() {
