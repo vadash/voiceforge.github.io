@@ -1,6 +1,7 @@
 {
   "name": "edge-tts-web",
   "version": "3.0.0",
+  "type": "module",
   "description": "Edge TTS Web Application - Text to Speech converter",
   "scripts": {
     "dev": "webpack serve --mode development",
