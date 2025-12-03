@@ -1,10 +1,12 @@
 import { useRef } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { textContent, bookLoaded, addStatusLine } from '../../state/appState';
+import { useData, useLogs } from '../../stores';
 import { convertFileToTxt } from '../../services/FileConverter';
 
 export function FileUpload() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const dataStore = useData();
+  const logs = useLogs();
 
   const handleFileChange = async (e: Event) => {
     const input = e.target as HTMLInputElement;
@@ -16,18 +18,19 @@ export function FileUpload() {
         const converted = await convertFileToTxt(file);
 
         for (const { filename, content } of converted) {
-          textContent.value += (textContent.value ? '\n\n' : '') + content;
+          const currentText = dataStore.textContent.value;
+          dataStore.setTextContent(currentText + (currentText ? '\n\n' : '') + content);
         }
 
         if (converted.length === 1) {
-          addStatusLine(`Loaded: ${file.name}`);
+          logs.info(`Loaded: ${file.name}`);
         } else {
-          addStatusLine(`Loaded: ${file.name} (${converted.length} files)`);
+          logs.info(`Loaded: ${file.name} (${converted.length} files)`);
         }
       }
-      bookLoaded.value = true;
+      dataStore.bookLoaded.value = true;
     } catch (err) {
-      addStatusLine(`Error loading file: ${(err as Error).message}`);
+      logs.error(`Error loading file: ${(err as Error).message}`);
     }
 
     input.value = '';

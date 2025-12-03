@@ -1,17 +1,19 @@
 import { Text } from 'preact-i18n';
-import {
-  rate, pitch, maxThreads,
-  rateDisplay, pitchDisplay,
-  showDopSettings, lexxRegister,
-  outputFormat, silenceRemovalEnabled, normalizationEnabled,
-  ffmpegError,
-  saveSettings, saveLLMSettings
-} from '../../state/appState';
+import { useSettings, useConversion, useLLM } from '../../stores';
 import { Slider } from './Slider';
 import { PointsSelector } from './PointsSelector';
 import { LLMSettingsPanel } from './LLMSettingsPanel';
 
 export function SettingsPanel() {
+  const settings = useSettings();
+  const conversion = useConversion();
+  const llm = useLLM();
+
+  const handleSave = async () => {
+    settings.save();
+    await llm.saveSettings();
+  };
+
   return (
     <div class="settings-panel">
       <LLMSettingsPanel />
@@ -21,48 +23,48 @@ export function SettingsPanel() {
 
       <Slider
         label={<Text id="settings.rate">Speed</Text>}
-        value={rate.value}
+        value={settings.rate.value}
         min={-50}
         max={100}
-        display={rateDisplay.value}
-        onChange={(v) => rate.value = v}
+        display={settings.rateDisplay.value}
+        onChange={(v) => settings.setRate(v)}
       />
 
       <div
         class="dop-settings-toggle"
-        onClick={() => showDopSettings.value = !showDopSettings.value}
+        onClick={() => settings.toggleDopSettings()}
         style={{ cursor: 'pointer', textAlign: 'center', marginBottom: '0.5rem' }}
       >
         <label style={{ cursor: 'pointer' }}>
-          {showDopSettings.value ? '▲' : '▼'} <Text id="settings.additional">Additional</Text>
+          {settings.showDopSettings.value ? '▲' : '▼'} <Text id="settings.additional">Additional</Text>
         </label>
       </div>
 
-      {showDopSettings.value && (
+      {settings.showDopSettings.value && (
         <div class="dop-settings">
           <Slider
             label={<Text id="settings.pitch">Pitch</Text>}
-            value={pitch.value}
+            value={settings.pitch.value}
             min={-50}
             max={50}
-            display={pitchDisplay.value}
-            onChange={(v) => pitch.value = v}
+            display={settings.pitchDisplay.value}
+            onChange={(v) => settings.setPitch(v)}
           />
 
           <Slider
             label={<Text id="settings.threads">Threads</Text>}
-            value={maxThreads.value}
+            value={settings.maxThreads.value}
             min={1}
             max={30}
-            display={`${maxThreads.value}`}
-            onChange={(v) => maxThreads.value = v}
+            display={`${settings.maxThreads.value}`}
+            onChange={(v) => settings.setMaxThreads(v)}
           />
 
           <label class="toggle-wrapper">
             <span><Text id="settings.outputFormat">Output Format</Text></span>
             <select
-              value={outputFormat.value}
-              onChange={(e) => outputFormat.value = (e.target as HTMLSelectElement).value as 'mp3' | 'opus'}
+              value={settings.outputFormat.value}
+              onChange={(e) => settings.setOutputFormat((e.target as HTMLSelectElement).value as 'mp3' | 'opus')}
               style={{ marginLeft: 'auto', padding: '0.25rem' }}
             >
               <option value="opus">Opus</option>
@@ -70,15 +72,15 @@ export function SettingsPanel() {
             </select>
           </label>
 
-          {outputFormat.value === 'opus' && (
+          {settings.outputFormat.value === 'opus' && (
             <>
               <label class="toggle-wrapper">
                 <span><Text id="settings.silenceRemoval">Remove Silence</Text></span>
                 <input
                   type="checkbox"
                   class="toggle"
-                  checked={silenceRemovalEnabled.value}
-                  onChange={(e) => silenceRemovalEnabled.value = (e.target as HTMLInputElement).checked}
+                  checked={settings.silenceRemovalEnabled.value}
+                  onChange={(e) => settings.setSilenceRemovalEnabled((e.target as HTMLInputElement).checked)}
                 />
               </label>
 
@@ -87,14 +89,14 @@ export function SettingsPanel() {
                 <input
                   type="checkbox"
                   class="toggle"
-                  checked={normalizationEnabled.value}
-                  onChange={(e) => normalizationEnabled.value = (e.target as HTMLInputElement).checked}
+                  checked={settings.normalizationEnabled.value}
+                  onChange={(e) => settings.setNormalizationEnabled((e.target as HTMLInputElement).checked)}
                 />
               </label>
 
-              {ffmpegError.value && (
+              {conversion.ffmpegError.value && (
                 <div style={{ color: 'var(--warning-color, #f90)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                  ⚠️ {ffmpegError.value}
+                  ⚠️ {conversion.ffmpegError.value}
                 </div>
               )}
             </>
@@ -105,15 +107,15 @@ export function SettingsPanel() {
             <input
               type="checkbox"
               class="toggle"
-              checked={lexxRegister.value}
-              onChange={(e) => lexxRegister.value = (e.target as HTMLInputElement).checked}
+              checked={settings.lexxRegister.value}
+              onChange={(e) => settings.setLexxRegister((e.target as HTMLInputElement).checked)}
             />
           </label>
         </div>
       )}
 
       <button
-        onClick={() => { saveSettings(); void saveLLMSettings(); }}
+        onClick={handleSave}
         style={{ width: '100%', marginBottom: '1rem' }}
       >
         💾 <Text id="settings.save">Save Settings</Text>

@@ -1,11 +1,14 @@
 import { useRef, useCallback } from 'preact/hooks';
-import { statusLines, processedCount, totalCount, statusAreaWidth, saveSettings } from '../state/appState';
+import { useLogs, useConversion, useSettings } from '../stores';
 
 export function StatusArea() {
-  const statusText = statusLines.value.join('\n');
-  const progress = totalCount.value > 0
-    ? `${processedCount.value} / ${totalCount.value}`
-    : '';
+  const logs = useLogs();
+  const conversion = useConversion();
+  const settings = useSettings();
+
+  const statusText = logs.getStatusLines().join('\n');
+  const { current, total } = conversion.progress.value;
+  const progress = total > 0 ? `${current} / ${total}` : '';
 
   const isDragging = useRef(false);
   const resizerRef = useRef<HTMLDivElement>(null);
@@ -21,7 +24,7 @@ export function StatusArea() {
       if (!isDragging.current) return;
       const newWidth = window.innerWidth - e.clientX;
       const clampedWidth = Math.max(250, Math.min(newWidth, window.innerWidth * 0.5));
-      statusAreaWidth.value = clampedWidth;
+      settings.setStatusAreaWidth(clampedWidth);
     };
 
     const handleMouseUp = () => {
@@ -31,17 +34,17 @@ export function StatusArea() {
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      saveSettings();
+      settings.save();
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, []);
+  }, [settings]);
 
   return (
     <div
       class="status-area"
-      style={{ width: `${statusAreaWidth.value}px` }}
+      style={{ width: `${settings.statusAreaWidth.value}px` }}
     >
       <div
         ref={resizerRef}

@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals';
-import { narratorVoice, rate, pitch } from '../../state/appState';
+import { useSettings } from '../../stores';
 import voices from './voices';
 import { EdgeTTSService } from '../../services/EdgeTTSService';
 
@@ -20,6 +20,8 @@ const samplePhrase = signal<string>(SAMPLE_PHRASES[Math.floor(Math.random() * SA
 const isPlaying = signal<boolean>(false);
 
 export function VoiceSelector() {
+  const settings = useSettings();
+
   const playVoiceSample = async () => {
     if (isPlaying.value || !samplePhrase.value.trim()) return;
 
@@ -32,9 +34,9 @@ export function VoiceSelector() {
           filename: 'sample',
           filenum: '0',
           config: {
-            voice: `Microsoft Server Speech Text to Speech Voice (${narratorVoice.value})`,
-            rate: `${rate.value >= 0 ? '+' : ''}${rate.value}%`,
-            pitch: `${pitch.value >= 0 ? '+' : ''}${pitch.value}Hz`,
+            voice: `Microsoft Server Speech Text to Speech Voice (${settings.narratorVoice.value})`,
+            rate: `${settings.rate.value >= 0 ? '+' : ''}${settings.rate.value}%`,
+            pitch: `${settings.pitch.value >= 0 ? '+' : ''}${settings.pitch.value}Hz`,
             volume: '+0%'
           },
           text: samplePhrase.value,
@@ -71,8 +73,8 @@ export function VoiceSelector() {
       <div class="voice-selector-row">
         <select
           class="voice-select"
-          value={narratorVoice.value}
-          onChange={(e) => narratorVoice.value = (e.target as HTMLSelectElement).value}
+          value={settings.narratorVoice.value}
+          onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
         >
           {voices.map((v) => (
             <option key={v.fullValue} value={v.fullValue}>

@@ -1,12 +1,14 @@
 import { Text } from 'preact-i18n';
-import { textContent, isProcessing, book } from '../state/appState';
-import { useTTSConversion } from '../hooks/useTTSConversion';
+import { useData, useConversion } from '../stores';
+import { useTTSConversion } from '../hooks/useTTSConversionNew';
 
 export function ConvertButton() {
+  const dataStore = useData();
+  const conversionStore = useConversion();
   const { startConversion, selectDirectory } = useTTSConversion();
 
   const handleClick = async () => {
-    if (!textContent.value.trim()) {
+    if (!dataStore.textContent.value.trim()) {
       return;
     }
 
@@ -15,16 +17,16 @@ export function ConvertButton() {
     if (!canProceed) return;
 
     // Start conversion
-    await startConversion(textContent.value, book.value);
+    await startConversion(dataStore.textContent.value, dataStore.book.value);
   };
 
   return (
     <button
       class="convert-btn"
       onClick={handleClick}
-      disabled={isProcessing.value}
+      disabled={conversionStore.isProcessing.value}
     >
-      {isProcessing.value ? (
+      {conversionStore.isProcessing.value ? (
         <Text id="status.processing">Processing...</Text>
       ) : (
         <Text id="convert.button">Save to MP3</Text>

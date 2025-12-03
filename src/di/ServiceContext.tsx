@@ -7,15 +7,11 @@ import { ServiceContainer, ServiceTypes, createContainer } from './ServiceContai
 import { defaultConfig, type AppConfig } from '@/config';
 
 // Import service implementations
-import { EdgeTTSService } from '@/services/EdgeTTSService';
-import { TTSWorkerPool } from '@/services/TTSWorkerPool';
-import { AudioMerger } from '@/services/AudioMerger';
-import { LLMVoiceService } from '@/services/LLMVoiceService';
+// Note: EdgeTTSService, TTSWorkerPool, AudioMerger, LLMVoiceService, TextProcessor,
+// VoiceAssigner, and FileConverter are created per-conversion by the orchestrator,
+// not pre-registered in the container.
 import { ffmpegService } from '@/services/FFmpegService';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
-import { TextProcessor } from '@/services/TextProcessor';
-import { VoiceAssigner } from '@/services/VoiceAssigner';
-import { FileConverter } from '@/services/FileConverter';
 
 import type {
   ILogger,

@@ -1,18 +1,15 @@
 import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import {
-  llmApiKey,
-  llmApiUrl,
-  llmModel,
-} from '../../state/appState';
+import { useLLM } from '../../stores';
 import { LLMVoiceService } from '../../services/LLMVoiceService';
 
 export function LLMSettingsPanel() {
+  const llm = useLLM();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
 
   const handleTestConnection = async () => {
-    if (!llmApiKey.value) {
+    if (!llm.apiKey.value) {
       setTestResult({ success: false, error: 'API key is required' });
       return;
     }
@@ -21,9 +18,9 @@ export function LLMSettingsPanel() {
     setTestResult(null);
 
     const service = new LLMVoiceService({
-      apiKey: llmApiKey.value,
-      apiUrl: llmApiUrl.value,
-      model: llmModel.value,
+      apiKey: llm.apiKey.value,
+      apiUrl: llm.apiUrl.value,
+      model: llm.model.value,
       narratorVoice: '',
     });
 
@@ -56,9 +53,9 @@ export function LLMSettingsPanel() {
           </label>
           <input
             type="password"
-            value={llmApiKey.value}
+            value={llm.apiKey.value}
             onInput={(e) => {
-              llmApiKey.value = (e.target as HTMLInputElement).value;
+              llm.setApiKey((e.target as HTMLInputElement).value);
             }}
             placeholder="Api key will be encrypted in browser local storage"
             style={{
@@ -79,9 +76,9 @@ export function LLMSettingsPanel() {
           </label>
           <input
             type="text"
-            value={llmApiUrl.value}
+            value={llm.apiUrl.value}
             onInput={(e) => {
-              llmApiUrl.value = (e.target as HTMLInputElement).value;
+              llm.setApiUrl((e.target as HTMLInputElement).value);
             }}
             placeholder="https://enter.api.url.here.open.ai.compatible/v1"
             style={{
@@ -102,9 +99,9 @@ export function LLMSettingsPanel() {
           </label>
           <input
             type="text"
-            value={llmModel.value}
+            value={llm.model.value}
             onInput={(e) => {
-              llmModel.value = (e.target as HTMLInputElement).value;
+              llm.setModel((e.target as HTMLInputElement).value);
             }}
             placeholder="your-model-name"
             style={{
@@ -121,7 +118,7 @@ export function LLMSettingsPanel() {
 
         <button
           onClick={handleTestConnection}
-          disabled={testing || !llmApiKey.value}
+          disabled={testing || !llm.apiKey.value}
           style={{ width: '100%', marginTop: '0.5rem' }}
         >
           {testing ? <><Text id="llm.testing">Testing...</Text></> : <>🔌 <Text id="llm.testConnection">Test Connection</Text></>}

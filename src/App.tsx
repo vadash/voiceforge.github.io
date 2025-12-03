@@ -1,5 +1,3 @@
-import { useEffect } from 'preact/hooks';
-import { loadSettings } from './state/appState';
 import { TextInput } from './components/TextInput';
 import { VoiceSelector } from './components/VoiceSelector/VoiceSelector';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
@@ -9,10 +7,6 @@ import { StatusArea } from './components/StatusArea';
 import { ConvertButton } from './components/ConvertButton';
 
 export function App() {
-  useEffect(() => {
-    void loadSettings();
-  }, []);
-
   return (
     <div class="app">
       <aside class="sidebar">

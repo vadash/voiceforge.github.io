@@ -1,16 +1,17 @@
 import { useText } from 'preact-i18n';
-import { textContent } from '../state/appState';
+import { useData } from '../stores';
 
 export function TextInput() {
   const { placeholder } = useText({ placeholder: 'text.placeholder' });
+  const dataStore = useData();
 
   return (
     <textarea
       class="text-input"
       id="text-area"
       placeholder={placeholder}
-      value={textContent.value}
-      onInput={(e) => textContent.value = (e.target as HTMLTextAreaElement).value}
+      value={dataStore.textContent.value}
+      onInput={(e) => dataStore.setTextContent((e.target as HTMLTextAreaElement).value)}
       style={{
         flex: 1,
         width: '100%',
