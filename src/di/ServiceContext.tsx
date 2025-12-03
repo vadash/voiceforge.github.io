@@ -117,6 +117,11 @@ class ConsoleLogger implements ILogger {
  */
 class SecureStorageAdapter implements ISecureStorage {
   private static readonly STORAGE_KEY = 'llm_api_key_encrypted';
+  private logger?: ILogger;
+
+  constructor(logger?: ILogger) {
+    this.logger = logger;
+  }
 
   async saveApiKey(key: string): Promise<void> {
     const encrypted = await encryptValue(key);
@@ -126,7 +131,7 @@ class SecureStorageAdapter implements ISecureStorage {
   async loadApiKey(): Promise<string> {
     const encrypted = localStorage.getItem(SecureStorageAdapter.STORAGE_KEY);
     if (!encrypted) return '';
-    return decryptValue(encrypted);
+    return decryptValue(encrypted, this.logger);
   }
 
   async clearApiKey(): Promise<void> {
@@ -183,8 +188,11 @@ export function createProductionContainer(config: AppConfig = defaultConfig): Se
   // Register logger (singleton)
   container.registerSingleton(ServiceTypes.Logger, () => new ConsoleLogger());
 
-  // Register secure storage (singleton)
-  container.registerSingleton(ServiceTypes.SecureStorage, () => new SecureStorageAdapter());
+  // Register secure storage (singleton) - needs logger
+  container.registerSingleton(ServiceTypes.SecureStorage, () => {
+    const logger = container.get<ILogger>(ServiceTypes.Logger);
+    return new SecureStorageAdapter(logger);
+  });
 
   // Register FFmpeg service (singleton - wraps existing singleton)
   container.registerSingleton(ServiceTypes.FFmpegService, () => new FFmpegServiceAdapter());
@@ -230,7 +238,10 @@ export function createTestContainer(overrides: ServiceOverrides = {}): ServiceCo
   if (overrides.secureStorage) {
     container.registerInstance(ServiceTypes.SecureStorage, overrides.secureStorage);
   } else {
-    container.registerSingleton(ServiceTypes.SecureStorage, () => new SecureStorageAdapter());
+    container.registerSingleton(ServiceTypes.SecureStorage, () => {
+      const logger = container.get<ILogger>(ServiceTypes.Logger);
+      return new SecureStorageAdapter(logger);
+    });
   }
 
   // Register FFmpeg service

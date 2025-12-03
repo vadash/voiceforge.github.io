@@ -3,6 +3,7 @@
 
 import { signal, computed } from '@preact/signals';
 import type { AppSettings } from '@/state/types';
+import type { LogStore } from './LogStore';
 
 const SETTINGS_KEY = 'edgetts_settings';
 
@@ -31,6 +32,8 @@ const defaultSettings: AppSettings = {
  * Settings Store - manages user preferences
  */
 export class SettingsStore {
+  private logStore?: LogStore;
+
   // Voice settings
   readonly voice = signal<string>(defaultSettings.voice);
   readonly narratorVoice = signal<string>(defaultSettings.narratorVoice);
@@ -64,6 +67,12 @@ export class SettingsStore {
   readonly pitchDisplay = computed(() =>
     this.pitch.value >= 0 ? `+${this.pitch.value}Hz` : `${this.pitch.value}Hz`
   );
+
+  // ========== Logger Setup ==========
+
+  setLogStore(logStore: LogStore): void {
+    this.logStore = logStore;
+  }
 
   // ========== Voice Setters ==========
 
@@ -222,7 +231,12 @@ export class SettingsStore {
         this.normalizationEnabled.value = settings.normalizationEnabled ?? defaultSettings.normalizationEnabled;
       }
     } catch (e) {
-      console.error('Failed to load settings:', e);
+      const errorMsg = 'Failed to load settings';
+      if (this.logStore) {
+        this.logStore.error(errorMsg, e instanceof Error ? e : undefined, e instanceof Error ? undefined : { error: String(e) });
+      } else {
+        console.error(errorMsg, e);
+      }
     }
   }
 

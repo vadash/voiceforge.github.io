@@ -2,7 +2,7 @@
 // Manages application logs with structured entries
 
 import { signal, computed } from '@preact/signals';
-import type { LogLevel, LogEntry } from '@/services/interfaces';
+import type { LogLevel, LogEntry, ILogger } from '@/services/interfaces';
 
 /**
  * Generate unique ID for log entries
@@ -25,7 +25,7 @@ function formatElapsedTime(startTime: number): string {
 /**
  * Log Store - manages application logs
  */
-export class LogStore {
+export class LogStore implements ILogger {
   // Log entries
   readonly entries = signal<LogEntry[]>([]);
 
@@ -153,8 +153,11 @@ export class LogStore {
   /**
    * Add error entry
    */
-  error(message: string, data?: Record<string, unknown>): void {
-    this.add('error', message, data);
+  error(message: string, error?: Error, data?: Record<string, unknown>): void {
+    const errorData = error
+      ? { ...data, error: error.message, stack: error.stack }
+      : data;
+    this.add('error', message, errorData);
   }
 
   /**

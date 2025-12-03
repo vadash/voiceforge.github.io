@@ -123,11 +123,19 @@ export function useLanguage(): LanguageStore {
  * Create all stores with default configuration
  */
 export function createStores(): Stores {
+  const logs = createLogStore();
+  const settings = createSettingsStore();
+  const llm = createLLMStore();
+
+  // Connect logger to stores that need it
+  settings.setLogStore(logs);
+  llm.setLogStore(logs);
+
   return {
-    settings: createSettingsStore(),
+    settings,
     conversion: createConversionStore(),
-    llm: createLLMStore(),
-    logs: createLogStore(),
+    llm,
+    logs,
     data: createDataStore(),
     language: createLanguageStore(),
   };

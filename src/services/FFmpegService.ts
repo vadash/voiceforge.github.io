@@ -4,6 +4,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import { defaultConfig } from '@/config';
+import type { ILogger } from './interfaces';
 
 export interface AudioProcessingConfig {
   silenceRemoval: boolean;
@@ -28,6 +29,7 @@ class FFmpegService {
   private loadPromise: Promise<boolean> | null = null;
   private loaded = false;
   private loadError: string | null = null;
+  private logger?: ILogger;
 
   private constructor() {}
 
@@ -36,6 +38,10 @@ class FFmpegService {
       FFmpegService.instance = new FFmpegService();
     }
     return FFmpegService.instance;
+  }
+
+  setLogger(logger: ILogger): void {
+    this.logger = logger;
   }
 
   /**
@@ -54,7 +60,7 @@ class FFmpegService {
 
     // Set up logging
     ffmpeg.on('log', ({ message }) => {
-      console.log('[FFmpeg]', message);
+      this.logger?.debug(`[FFmpeg] ${message}`);
     });
 
     for (let i = 0; i < CDN_MIRRORS.length; i++) {
@@ -78,7 +84,7 @@ class FFmpegService {
         onProgress?.('FFmpeg loaded successfully');
         return true;
       } catch (err) {
-        console.warn(`FFmpeg CDN ${cdn.baseUrl} failed:`, err);
+        this.logger?.warn(`FFmpeg CDN ${cdn.baseUrl} failed`, { error: err instanceof Error ? err.message : String(err) });
         continue;
       }
     }

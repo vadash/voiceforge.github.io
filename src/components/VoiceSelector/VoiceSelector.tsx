@@ -1,6 +1,7 @@
 import { signal } from '@preact/signals';
 import { Text } from 'preact-i18n';
 import { useSettings } from '../../stores';
+import { useLogger } from '../../di';
 import voices from './voices';
 import { EdgeTTSService } from '../../services/EdgeTTSService';
 
@@ -22,6 +23,7 @@ const isPlaying = signal<boolean>(false);
 
 export function VoiceSelector() {
   const settings = useSettings();
+  const logger = useLogger();
 
   const playVoiceSample = async () => {
     if (isPlaying.value || !samplePhrase.value.trim()) return;
@@ -63,7 +65,7 @@ export function VoiceSelector() {
 
       await audio.play();
     } catch (e) {
-      console.error('Failed to play sample:', e);
+      logger.error('Failed to play sample', e instanceof Error ? e : undefined);
       isPlaying.value = false;
     }
   };

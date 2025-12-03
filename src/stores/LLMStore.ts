@@ -4,6 +4,7 @@
 import { signal, computed } from '@preact/signals';
 import type { LLMCharacter } from '@/state/types';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
+import type { LogStore } from './LogStore';
 
 const LLM_SETTINGS_KEY = 'edgetts_llm_settings';
 
@@ -36,6 +37,8 @@ const defaultLLMSettings = {
  * LLM Store - manages LLM settings and character data
  */
 export class LLMStore {
+  private logStore?: LogStore;
+
   // Settings (persisted)
   readonly enabled = signal<boolean>(defaultLLMSettings.enabled);
   readonly apiKey = signal<string>(defaultLLMSettings.apiKey);
@@ -81,6 +84,12 @@ export class LLMStore {
   readonly characterNames = computed(() =>
     this.detectedCharacters.value.map(c => c.canonicalName)
   );
+
+  // ========== Logger Setup ==========
+
+  setLogStore(logStore: LogStore): void {
+    this.logStore = logStore;
+  }
 
   // ========== Settings Actions ==========
 
@@ -208,7 +217,12 @@ export class LLMStore {
       };
       localStorage.setItem(LLM_SETTINGS_KEY, JSON.stringify(settings));
     } catch (e) {
-      console.error('Failed to save LLM settings:', e);
+      const errorMsg = 'Failed to save LLM settings';
+      if (this.logStore) {
+        this.logStore.error(errorMsg, e instanceof Error ? e : undefined, e instanceof Error ? undefined : { error: String(e) });
+      } else {
+        console.error(errorMsg, e);
+      }
     }
   }
 
@@ -221,12 +235,17 @@ export class LLMStore {
       if (saved) {
         const settings: LLMSettings = JSON.parse(saved);
         this.enabled.value = settings.enabled ?? defaultLLMSettings.enabled;
-        this.apiKey.value = await decryptValue(settings.apiKey ?? '');
+        this.apiKey.value = await decryptValue(settings.apiKey ?? '', this.logStore);
         this.apiUrl.value = settings.apiUrl ?? defaultLLMSettings.apiUrl;
         this.model.value = settings.model ?? defaultLLMSettings.model;
       }
     } catch (e) {
-      console.error('Failed to load LLM settings:', e);
+      const errorMsg = 'Failed to load LLM settings';
+      if (this.logStore) {
+        this.logStore.error(errorMsg, e instanceof Error ? e : undefined, e instanceof Error ? undefined : { error: String(e) });
+      } else {
+        console.error(errorMsg, e);
+      }
     }
   }
 }

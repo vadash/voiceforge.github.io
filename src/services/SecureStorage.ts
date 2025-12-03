@@ -6,6 +6,8 @@
  * - Browser-instance specific (won't work if copied elsewhere)
  */
 
+import type { ILogger } from './interfaces';
+
 const DB_NAME = 'edgetts_secure';
 const STORE_NAME = 'keys';
 const KEY_ID = 'master';
@@ -83,7 +85,7 @@ export async function encryptValue(plaintext: string): Promise<string> {
   return btoa(String.fromCharCode(...combined));
 }
 
-export async function decryptValue(encrypted: string): Promise<string> {
+export async function decryptValue(encrypted: string, logger?: ILogger): Promise<string> {
   if (!encrypted) return '';
 
   try {
@@ -102,7 +104,12 @@ export async function decryptValue(encrypted: string): Promise<string> {
     return new TextDecoder().decode(decrypted);
   } catch {
     // Decryption failed - key changed or data corrupted
-    console.warn('Failed to decrypt value - key may have changed');
+    const msg = 'Failed to decrypt value - key may have changed';
+    if (logger) {
+      logger.warn(msg);
+    } else {
+      console.warn(msg);
+    }
     return '';
   }
 }

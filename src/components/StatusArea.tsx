@@ -1,12 +1,14 @@
 import { useRef, useCallback, useEffect } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { useLogs, useConversion, useSettings } from '../stores';
+import { useLogger } from '../di';
 import type { LogLevel } from '../services/interfaces';
 
 export function StatusArea() {
   const logs = useLogs();
   const conversion = useConversion();
   const settings = useSettings();
+  const logger = useLogger();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { current, total } = conversion.progress.value;
@@ -78,9 +80,9 @@ export function StatusArea() {
     try {
       await navigator.clipboard.writeText(logs.toText());
     } catch (e) {
-      console.error('Failed to copy logs', e);
+      logger.error('Failed to copy logs', e instanceof Error ? e : undefined);
     }
-  }, [logs]);
+  }, [logs, logger]);
 
   const handleExport = useCallback(() => {
     const text = logs.toText();

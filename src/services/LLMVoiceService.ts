@@ -6,6 +6,7 @@ import type {
   SpeakerAssignment,
   LLMValidationResult,
 } from '@/state/types';
+import type { ILogger } from './interfaces';
 
 export interface LLMVoiceServiceOptions {
   apiKey: string;
@@ -13,6 +14,7 @@ export interface LLMVoiceServiceOptions {
   model: string;
   narratorVoice: string;
   directoryHandle?: FileSystemDirectoryHandle | null;
+  logger?: ILogger;
 }
 
 export interface ProgressCallback {
@@ -27,9 +29,11 @@ export class LLMVoiceService {
   private abortController: AbortController | null = null;
   private pass1Logged = false;
   private pass2Logged = false;
+  private logger?: ILogger;
 
   constructor(options: LLMVoiceServiceOptions) {
     this.options = options;
+    this.logger = options.logger;
   }
 
   /**
@@ -54,7 +58,7 @@ export class LLMVoiceService {
       await writable.write(JSON.stringify(content, null, 2));
       await writable.close();
     } catch (e) {
-      console.warn('Failed to save log:', e);
+      this.logger?.warn('Failed to save log', { error: e instanceof Error ? e.message : String(e) });
     }
   }
 
@@ -356,7 +360,7 @@ Tag speakers. Output index:code for each dialogue sentence.`;
         attempt++;
 
         const delay = delays[Math.min(attempt - 1, delays.length - 1)];
-        console.warn(`Validation failed, retrying in ${delay}ms:`, validation.errors);
+        this.logger?.warn(`Validation failed, retrying in ${delay}ms`, { errors: validation.errors });
         await this.sleep(delay);
       } catch (error) {
         if (this.abortController?.signal.aborted) {
@@ -365,7 +369,7 @@ Tag speakers. Output index:code for each dialogue sentence.`;
 
         attempt++;
         const delay = delays[Math.min(attempt - 1, delays.length - 1)];
-        console.error(`API error, retrying in ${delay}ms:`, error);
+        this.logger?.error(`API error, retrying in ${delay}ms`, error instanceof Error ? error : undefined, { error: String(error) });
         await this.sleep(delay);
       }
     }

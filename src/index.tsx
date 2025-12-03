@@ -3,7 +3,9 @@ import { IntlProvider } from 'preact-i18n';
 import { App } from './App';
 import { StoreProvider, createStores, initializeStores } from './stores';
 import { ServiceProvider, createProductionContainer } from './di';
+import { ServiceTypes } from './di';
 import type { SupportedLocale } from './stores/LanguageStore';
+import type { ILogger } from './services/interfaces';
 import en from './i18n/en.json';
 import ru from './i18n/ru.json';
 import './styles/global.css';
@@ -48,4 +50,9 @@ async function init() {
   }
 }
 
-init().catch(console.error);
+// Get logger for error handling
+const logger = container.get<ILogger>(ServiceTypes.Logger);
+
+init().catch((error) => {
+  logger.error('Application initialization failed', error instanceof Error ? error : undefined);
+});

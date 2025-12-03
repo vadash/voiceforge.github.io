@@ -5,6 +5,7 @@ import { sha256 } from '../utils/sha256';
 import { generateConnectionId } from '../utils/uuid';
 import { defaultConfig, WIN_EPOCH, S_TO_NS } from '@/config';
 import type { TTSConfig, StatusUpdate } from '../state/types';
+import type { ILogger } from './interfaces';
 
 export interface TTSWorkerOptions {
   indexPart: number;
@@ -15,6 +16,7 @@ export interface TTSWorkerOptions {
   onStatusUpdate?: (update: StatusUpdate) => void;
   onComplete?: (audioData: Uint8Array) => void;
   onError?: (error: Error) => void;
+  logger?: ILogger;
 }
 
 export class EdgeTTSService {
@@ -33,6 +35,7 @@ export class EdgeTTSService {
   private onStatusUpdate?: (update: StatusUpdate) => void;
   private onComplete?: (audioData: Uint8Array) => void;
   private onError?: (error: Error) => void;
+  private logger?: ILogger;
 
   constructor(options: TTSWorkerOptions) {
     this.bytesDataSeparator = new TextEncoder().encode('Path:audio\r\n');
@@ -47,6 +50,7 @@ export class EdgeTTSService {
     this.onStatusUpdate = options.onStatusUpdate;
     this.onComplete = options.onComplete;
     this.onError = options.onError;
+    this.logger = options.logger;
   }
 
   start(): void {
@@ -160,7 +164,8 @@ export class EdgeTTSService {
 
   private async saveMP3(): Promise<void> {
     if (this.audioData.length === 0) {
-      console.error('No audio data to save');
+      const errorMsg = 'No audio data to save';
+      this.logger?.error(errorMsg);
       return;
     }
 
