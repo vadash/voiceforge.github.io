@@ -3,6 +3,7 @@
 
 import { ffmpegService, type AudioProcessingConfig } from './FFmpegService';
 import { defaultConfig } from '@/config';
+import { sanitizeFilename } from '@/utils/fileUtils';
 
 export interface MergedFile {
   filename: string;
@@ -226,12 +227,13 @@ export class AudioMerger {
 
   private generateFilename(group: MergeGroup, totalGroups: number, extension: string): string {
     const durationMin = Math.round(group.durationMs / 60000);
+    const sanitizedName = sanitizeFilename(group.filename);
 
     if (totalGroups === 1) {
-      return `${group.filename}.${extension}`;
+      return `${sanitizedName}.${extension}`;
     } else {
       const paddedNum = String(group.mergeNumber).padStart(4, '0');
-      return `${group.filename} ${paddedNum}.${extension}`;
+      return `${sanitizedName} ${paddedNum}.${extension}`;
     }
   }
 
@@ -300,9 +302,11 @@ export class AudioMerger {
     directoryHandle: FileSystemDirectoryHandle
   ): Promise<void> {
     // Extract folder name from filename (remove extension and part number)
-    const folderName = file.filename
-      .replace(/\s+\d{4}\.(mp3|opus)$/, '')
-      .replace(/\.(mp3|opus)$/, '');
+    const folderName = sanitizeFilename(
+      file.filename
+        .replace(/\s+\d{4}\.(mp3|opus)$/, '')
+        .replace(/\.(mp3|opus)$/, '')
+    );
 
     const folderHandle = await directoryHandle.getDirectoryHandle(folderName, { create: true });
     const fileHandle = await folderHandle.getFileHandle(file.filename, { create: true });
