@@ -1,25 +1,101 @@
-import { narratorVoice } from '../../state/appState';
+import { signal } from '@preact/signals';
+import { narratorVoice, rate, pitch } from '../../state/appState';
 import voices from './voices';
+import { EdgeTTSService } from '../../services/EdgeTTSService';
+
+const SAMPLE_PHRASES = [
+  "The quick brown fox jumps over the lazy dog",
+  "Every moment is a fresh beginning",
+  "Fortune favors the bold",
+  "The stars shine bright tonight",
+  "Welcome to the world of voices",
+  "Hello and thank you for listening",
+  "This is a sample of the selected voice",
+  "Reading books is a wonderful adventure",
+  "The sun rises in the east and sets in the west",
+  "Music brings joy to the heart and soul"
+];
+
+const samplePhrase = signal<string>(SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]);
+const isPlaying = signal<boolean>(false);
 
 export function VoiceSelector() {
+  const playVoiceSample = async () => {
+    if (isPlaying.value || !samplePhrase.value.trim()) return;
+
+    isPlaying.value = true;
+
+    try {
+      const audioData = await new Promise<Uint8Array>((resolve, reject) => {
+        const tts = new EdgeTTSService({
+          indexPart: 0,
+          filename: 'sample',
+          filenum: '0',
+          config: {
+            voice: `Microsoft Server Speech Text to Speech Voice (${narratorVoice.value})`,
+            rate: `${rate.value >= 0 ? '+' : ''}${rate.value}%`,
+            pitch: `${pitch.value >= 0 ? '+' : ''}${pitch.value}Hz`,
+            volume: '+0%'
+          },
+          text: samplePhrase.value,
+          onComplete: resolve,
+          onError: reject
+        });
+        tts.start();
+      });
+
+      const blob = new Blob([(audioData.buffer as ArrayBuffer).slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength)], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        isPlaying.value = false;
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        isPlaying.value = false;
+      };
+
+      await audio.play();
+    } catch (e) {
+      console.error('Failed to play sample:', e);
+      isPlaying.value = false;
+    }
+  };
+
   return (
-    <div>
-      <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#666' }}>
-        Narrator Voice:
-      </label>
-      <select
-        class="voices"
-        id="voices"
-        value={narratorVoice.value}
-        onChange={(e) => narratorVoice.value = (e.target as HTMLSelectElement).value}
-        style={{ width: '80%', borderRadius: '10px' }}
-      >
-        {voices.map((v) => (
-          <option key={v.fullValue} value={v.fullValue}>
-            {v.fullValue} ({v.gender})
-          </option>
-        ))}
-      </select>
+    <div class="voice-selector">
+      <label class="voice-selector-label">Narrator Voice:</label>
+      <div class="voice-selector-row">
+        <select
+          class="voice-select"
+          value={narratorVoice.value}
+          onChange={(e) => narratorVoice.value = (e.target as HTMLSelectElement).value}
+        >
+          {voices.map((v) => (
+            <option key={v.fullValue} value={v.fullValue}>
+              {v.fullValue} ({v.gender})
+            </option>
+          ))}
+        </select>
+        <button
+          class="play-sample-btn"
+          onClick={playVoiceSample}
+          disabled={isPlaying.value}
+          title="Play sample"
+        >
+          {isPlaying.value ? '...' : '▶'}
+        </button>
+      </div>
+      <input
+        type="text"
+        class="sample-phrase-input"
+        value={samplePhrase.value}
+        onInput={(e) => samplePhrase.value = (e.target as HTMLInputElement).value}
+        placeholder="Sample phrase..."
+      />
     </div>
   );
 }

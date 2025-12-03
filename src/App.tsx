@@ -1,6 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { Text } from 'preact-i18n';
-import { isLiteMode, isProcessing, loadSettings } from './state/appState';
+import { loadSettings } from './state/appState';
 import { TextInput } from './components/TextInput';
 import { VoiceSelector } from './components/VoiceSelector/VoiceSelector';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
@@ -15,17 +14,9 @@ export function App() {
   }, []);
 
   return (
-    <div class={`app ${isLiteMode.value ? 'lite' : ''}`}>
+    <div class="app">
       <aside class="sidebar">
-        <div class="top-row">
-          <VoiceSelector />
-          <button
-            class="settings-toggle"
-            onClick={() => isLiteMode.value = !isLiteMode.value}
-          >
-            <Text id="settings.toggle">Settings</Text>
-          </button>
-        </div>
+        <VoiceSelector />
 
         <SettingsPanel />
 
@@ -38,10 +29,10 @@ export function App() {
       </aside>
 
       <main class="main-content">
-        {!isLiteMode.value && <TextInput />}
+        <TextInput />
       </main>
 
-      {!isLiteMode.value && <StatusArea />}
+      <StatusArea />
     </div>
   );
 }
