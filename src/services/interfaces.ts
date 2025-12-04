@@ -305,18 +305,6 @@ export interface DictionaryRule {
   replacement: string;
 }
 
-/**
- * Text processor for applying dictionary rules
- */
-export interface ITextProcessor {
-  /** Set dictionary rules */
-  setRules(rules: DictionaryRule[]): void;
-  /** Process text with dictionary rules */
-  processText(text: string): string;
-  /** Split text into sentences */
-  splitIntoSentences(text: string): string[];
-}
-
 // ============================================================================
 // Voice Assignment Interfaces
 // ============================================================================

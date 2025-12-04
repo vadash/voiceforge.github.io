@@ -17,8 +17,6 @@ const defaultSettings: AppSettings = {
   rate: 0,
   pitch: 0,
   maxThreads: 20,
-  pointsSelect: 'none',
-  pointsType: 'V1',
   lexxRegister: true,
   showDopSettings: false,
   isLiteMode: true,
@@ -50,8 +48,6 @@ export class SettingsStore {
   readonly normalizationEnabled = signal<boolean>(defaultSettings.normalizationEnabled);
 
   // Text processing settings
-  readonly pointsSelect = signal<string>(defaultSettings.pointsSelect);
-  readonly pointsType = signal<'V1' | 'V2' | 'V3'>(defaultSettings.pointsType);
   readonly lexxRegister = signal<boolean>(defaultSettings.lexxRegister);
 
   // UI settings
@@ -137,16 +133,6 @@ export class SettingsStore {
 
   // ========== Text Processing Setters ==========
 
-  setPointsSelect(value: string): void {
-    this.pointsSelect.value = value;
-    this.save();
-  }
-
-  setPointsType(value: 'V1' | 'V2' | 'V3'): void {
-    this.pointsType.value = value;
-    this.save();
-  }
-
   setLexxRegister(value: boolean): void {
     this.lexxRegister.value = value;
     this.save();
@@ -192,8 +178,6 @@ export class SettingsStore {
       rate: this.rate.value,
       pitch: this.pitch.value,
       maxThreads: this.maxThreads.value,
-      pointsSelect: this.pointsSelect.value,
-      pointsType: this.pointsType.value,
       lexxRegister: this.lexxRegister.value,
       showDopSettings: this.showDopSettings.value,
       isLiteMode: this.isLiteMode.value,
@@ -220,8 +204,6 @@ export class SettingsStore {
         this.rate.value = settings.rate ?? defaultSettings.rate;
         this.pitch.value = settings.pitch ?? defaultSettings.pitch;
         this.maxThreads.value = settings.maxThreads ?? defaultSettings.maxThreads;
-        this.pointsSelect.value = settings.pointsSelect ?? defaultSettings.pointsSelect;
-        this.pointsType.value = settings.pointsType ?? defaultSettings.pointsType;
         this.lexxRegister.value = settings.lexxRegister ?? defaultSettings.lexxRegister;
         this.showDopSettings.value = settings.showDopSettings ?? defaultSettings.showDopSettings;
         this.isLiteMode.value = settings.isLiteMode ?? defaultSettings.isLiteMode;
@@ -250,8 +232,6 @@ export class SettingsStore {
     this.rate.value = defaultSettings.rate;
     this.pitch.value = defaultSettings.pitch;
     this.maxThreads.value = defaultSettings.maxThreads;
-    this.pointsSelect.value = defaultSettings.pointsSelect;
-    this.pointsType.value = defaultSettings.pointsType;
     this.lexxRegister.value = defaultSettings.lexxRegister;
     this.showDopSettings.value = defaultSettings.showDopSettings;
     this.isLiteMode.value = defaultSettings.isLiteMode;
@@ -273,8 +253,6 @@ export class SettingsStore {
       rate: this.rate.value,
       pitch: this.pitch.value,
       maxThreads: this.maxThreads.value,
-      pointsSelect: this.pointsSelect.value,
-      pointsType: this.pointsType.value,
       lexxRegister: this.lexxRegister.value,
       showDopSettings: this.showDopSettings.value,
       isLiteMode: this.isLiteMode.value,

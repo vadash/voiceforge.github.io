@@ -13,7 +13,6 @@ export const ServiceTypes = {
   FFmpegService: Symbol.for('IFFmpegService'),
   Logger: Symbol.for('ILogger'),
   SecureStorage: Symbol.for('ISecureStorage'),
-  TextProcessor: Symbol.for('ITextProcessor'),
   VoiceAssigner: Symbol.for('IVoiceAssigner'),
   FileConverter: Symbol.for('IFileConverter'),
 

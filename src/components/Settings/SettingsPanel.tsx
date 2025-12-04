@@ -1,7 +1,6 @@
 import { Text } from 'preact-i18n';
 import { useSettings, useConversion, useLLM } from '../../stores';
 import { Slider } from './Slider';
-import { PointsSelector } from './PointsSelector';
 import { LLMSettingsPanel } from './LLMSettingsPanel';
 
 export function SettingsPanel() {
@@ -19,8 +18,6 @@ export function SettingsPanel() {
       <LLMSettingsPanel />
 
       <div class="settings-section">
-        <PointsSelector />
-
       <Slider
         label={<Text id="settings.rate">Speed</Text>}
         value={settings.rate.value}

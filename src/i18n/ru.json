@@ -15,18 +15,6 @@
     "outputFormat": "Формат вывода",
     "silenceRemoval": "Удалить тишину",
     "normalization": "Нормализация звука",
-    "points": {
-      "label": "Замена точек",
-      "none": "Не заменять точки",
-      "comma": "Заменять точки на ,",
-      "semicolon": "Заменять точки на ;",
-      "colon": "Заменять точки на :"
-    },
-    "pointsType": {
-      "v1": "V1",
-      "v2": "V2",
-      "v3": "V3"
-    },
     "dictionary": {
       "label": "Реестр словаря",
       "caseSensitive": "Регистр словаря"

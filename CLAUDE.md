@@ -39,7 +39,6 @@ The conversion pipeline uses composable steps:
 - **ConversionOrchestrator**: Builds and runs the pipeline, handles progress updates to stores
 - **EdgeTTSService**: WebSocket client for Edge TTS API. Sends SSML via WebSocket, receives binary audio chunks, handles reconnection on failure.
 - **TTSWorkerPool**: Queue-based worker pool with retry logic (3 retries, exponential backoff). Manages concurrent TTS requests.
-- **TextProcessor**: Applies .lexx dictionary rules (regex and word-based), handles punctuation replacement, splits text into chunks.
 - **FileConverter**: Converts FB2 (XML parser), EPUB (JSZip + NCX navigation), ZIP archives to plain text.
 - **AudioMerger**: Merges audio by ~30min duration, supports Opus encoding via FFmpeg.
 - **FFmpegService**: Singleton for FFmpeg WASM loading from CDN (jsdelivr/unpkg/cdnjs fallback). Handles Opus encoding, silence removal, and normalization.

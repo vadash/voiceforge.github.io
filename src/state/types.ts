@@ -14,8 +14,6 @@ export interface AppSettings {
   rate: number;
   pitch: number;
   maxThreads: number;
-  pointsSelect: string;
-  pointsType: 'V1' | 'V2' | 'V3';
   lexxRegister: boolean;
   showDopSettings: boolean;
   isLiteMode: boolean;

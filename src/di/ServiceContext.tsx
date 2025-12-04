@@ -7,7 +7,7 @@ import { ServiceContainer, ServiceTypes, createContainer } from './ServiceContai
 import { defaultConfig, type AppConfig } from '@/config';
 
 // Import service implementations
-// Note: EdgeTTSService, TTSWorkerPool, AudioMerger, LLMVoiceService, TextProcessor,
+// Note: EdgeTTSService, TTSWorkerPool, AudioMerger, LLMVoiceService,
 // VoiceAssigner, and FileConverter are created per-conversion by the orchestrator,
 // not pre-registered in the container.
 import { ffmpegService } from '@/services/FFmpegService';

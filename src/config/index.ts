@@ -82,24 +82,12 @@ export interface EdgeTTSApiConfig {
   audioFormat: string;
 }
 
-export interface TextProcessingConfig {
-  /** Maximum chunk size for initial text processing (characters). Used by TextProcessor to control sentence grouping before TTS conversion. Smaller chunks reduce memory usage and improve processing responsiveness. */
-  firstStringsLength: number;
-  /** Maximum chunk size for final text segments (characters). Used in TextProcessor.splitIntoSections() to split text when encountering punctuation at segment boundaries. Larger than firstStringsLength to ensure complete sentences and avoid mid-sentence cuts. */
-  lastStringsLength: number;
-  /** Default number of parallel TTS conversion threads. Used as fallback value in SettingsStore when user hasn't configured custom maxThreads. Controls concurrent WebSocket connections to Edge TTS API. */
-  defaultThreads: number;
-  /** Default number of audio segments to merge. This value appears to be a legacy parameter from earlier merge logic; current AudioMerger uses duration-based merging (30-minute chunks) rather than count-based merging. */
-  defaultMerge: number;
-}
-
 export interface AppConfig {
   tts: TTSConfig;
   audio: AudioConfig;
   llm: LLMConfig;
   ffmpeg: FFmpegConfig;
   edgeTtsApi: EdgeTTSApiConfig;
-  textProcessing: TextProcessingConfig;
 }
 
 /**
@@ -156,13 +144,6 @@ export const defaultConfig: AppConfig = {
     trustedClientToken: '6A5AA1D4EAFF4E9FB37E23D68491D6F4',
     secMsGecVersion: '1-130.0.2849.68',
     audioFormat: 'audio-24khz-96kbitrate-mono-mp3',
-  },
-
-  textProcessing: {
-    firstStringsLength: 800,
-    lastStringsLength: 4200,
-    defaultThreads: 20,
-    defaultMerge: 10,
   },
 };
 

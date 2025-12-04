@@ -15,18 +15,6 @@
     "outputFormat": "Output Format",
     "silenceRemoval": "Remove Silence",
     "normalization": "Normalize Audio",
-    "points": {
-      "label": "Point replacement",
-      "none": "Don't replace periods",
-      "comma": "Replace periods with ,",
-      "semicolon": "Replace periods with ;",
-      "colon": "Replace periods with :"
-    },
-    "pointsType": {
-      "v1": "V1",
-      "v2": "V2",
-      "v3": "V3"
-    },
     "dictionary": {
       "label": "Dictionary register",
       "caseSensitive": "Dictionary case"
