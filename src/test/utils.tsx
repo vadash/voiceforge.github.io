@@ -19,10 +19,14 @@ export interface TestRenderOptions {
 export interface TestStoresState {
   settings?: {
     voice?: string;
+    narratorVoice?: string;
     rate?: number;
     pitch?: number;
     maxThreads?: number;
     outputFormat?: 'mp3' | 'opus';
+    silenceRemovalEnabled?: boolean;
+    normalizationEnabled?: boolean;
+    lexxRegister?: boolean;
   };
   conversion?: {
     status?: string;
@@ -30,6 +34,13 @@ export interface TestStoresState {
   };
   data?: {
     textContent?: string;
+    dictionaryRaw?: string[];
+    // Note: detectedLanguage is computed from textContent, not settable directly
+  };
+  llm?: {
+    enabled?: boolean;
+    apiUrl?: string;
+    model?: string;
   };
 }
 
@@ -48,16 +59,21 @@ export function renderWithProviders(
 ): TestRenderResult {
   const stores = createStores();
 
-  // Apply initial state if provided
+  // Apply initial settings state
   if (options.stores?.settings) {
     const s = options.stores.settings;
-    if (s.voice) stores.settings.setNarratorVoice(s.voice);
+    if (s.voice !== undefined) stores.settings.voice.value = s.voice;
+    if (s.narratorVoice !== undefined) stores.settings.setNarratorVoice(s.narratorVoice);
     if (s.rate !== undefined) stores.settings.setRate(s.rate);
     if (s.pitch !== undefined) stores.settings.setPitch(s.pitch);
     if (s.maxThreads !== undefined) stores.settings.setMaxThreads(s.maxThreads);
-    if (s.outputFormat) stores.settings.setOutputFormat(s.outputFormat);
+    if (s.outputFormat !== undefined) stores.settings.setOutputFormat(s.outputFormat);
+    if (s.silenceRemovalEnabled !== undefined) stores.settings.setSilenceRemovalEnabled(s.silenceRemovalEnabled);
+    if (s.normalizationEnabled !== undefined) stores.settings.setNormalizationEnabled(s.normalizationEnabled);
+    if (s.lexxRegister !== undefined) stores.settings.lexxRegister.value = s.lexxRegister;
   }
 
+  // Apply initial conversion state
   if (options.stores?.conversion) {
     const c = options.stores.conversion;
     if (c.progress) {
@@ -65,9 +81,19 @@ export function renderWithProviders(
     }
   }
 
+  // Apply initial data state
   if (options.stores?.data) {
     const d = options.stores.data;
-    if (d.textContent) stores.data.setTextContent(d.textContent);
+    if (d.textContent !== undefined) stores.data.setTextContent(d.textContent);
+    if (d.dictionaryRaw !== undefined) stores.data.dictionaryRaw.value = d.dictionaryRaw;
+  }
+
+  // Apply initial LLM state
+  if (options.stores?.llm) {
+    const l = options.stores.llm;
+    if (l.enabled !== undefined) stores.llm.enabled.value = l.enabled;
+    if (l.apiUrl !== undefined) stores.llm.apiUrl.value = l.apiUrl;
+    if (l.model !== undefined) stores.llm.model.value = l.model;
   }
 
   const { container: serviceContainer, mocks } = createTestContainer(options.services);

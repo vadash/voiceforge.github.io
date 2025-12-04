@@ -52,63 +52,73 @@ export class TTSConversionStep extends BasePipelineStep {
 
     this.reportProgress(0, chunks.length, `Converting ${chunks.length} chunks to audio...`);
 
-    return new Promise((resolve, reject) => {
-      const audioMap = new Map<number, Uint8Array>();
-      const failedTasks = new Set<number>();
+    const audioMap = new Map<number, Uint8Array>();
+    const failedTasks = new Set<number>();
 
-      // Create abort handler
-      const abortHandler = () => {
-        this.workerPool?.clear();
-        reject(new Error('Pipeline cancelled'));
-      };
-      signal.addEventListener('abort', abortHandler);
+    // Create abort handler
+    const abortHandler = () => {
+      this.workerPool?.clear();
+    };
+    signal.addEventListener('abort', abortHandler);
 
-      // Create worker pool
-      this.workerPool = this.options.createWorkerPool({
-        maxWorkers: this.options.maxWorkers,
-        config: this.options.ttsConfig,
-        onStatusUpdate: (update) => {
-          this.reportProgress(audioMap.size, chunks.length, update.message);
-        },
-        onTaskComplete: (partIndex, audioData) => {
-          audioMap.set(partIndex, audioData);
-          this.reportProgress(audioMap.size, chunks.length, `Completed ${audioMap.size}/${chunks.length}`);
-        },
-        onTaskError: (partIndex, error) => {
-          failedTasks.add(partIndex);
-          this.reportProgress(audioMap.size, chunks.length, `Part ${partIndex + 1} failed: ${error.message}`);
-        },
-        onAllComplete: () => {
-          signal.removeEventListener('abort', abortHandler);
-
-          resolve({
-            ...context,
-            audioMap,
-            failedTasks,
-          });
-        },
-      });
-
-      // Build tasks
-      const tasks: PoolTask[] = chunks.map((chunk) => {
-        let filename = fileNames[0]?.[0] ?? 'audio';
-        for (const [name, boundaryIndex] of fileNames) {
-          if (chunk.partIndex >= boundaryIndex && boundaryIndex > 0) {
-            filename = name;
-          }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        // Handle abort signal
+        if (signal.aborted) {
+          reject(new Error('Pipeline cancelled'));
+          return;
         }
 
-        return {
-          partIndex: chunk.partIndex,
-          text: chunk.text,
-          filename: filename,
-          filenum: String(chunk.partIndex + 1).padStart(4, '0'),
-          voice: chunk.voice,
-        };
-      });
+        // Create worker pool
+        this.workerPool = this.options.createWorkerPool({
+          maxWorkers: this.options.maxWorkers,
+          config: this.options.ttsConfig,
+          onStatusUpdate: (update) => {
+            this.reportProgress(audioMap.size, chunks.length, update.message);
+          },
+          onTaskComplete: (partIndex, audioData) => {
+            audioMap.set(partIndex, audioData);
+            this.reportProgress(audioMap.size, chunks.length, `Completed ${audioMap.size}/${chunks.length}`);
+          },
+          onTaskError: (partIndex, error) => {
+            failedTasks.add(partIndex);
+            this.reportProgress(audioMap.size, chunks.length, `Part ${partIndex + 1} failed: ${error.message}`);
+          },
+          onAllComplete: () => {
+            resolve();
+          },
+        });
 
-      this.workerPool.addTasks(tasks);
-    });
+        // Build tasks
+        const tasks: PoolTask[] = chunks.map((chunk) => {
+          let filename = fileNames[0]?.[0] ?? 'audio';
+          for (const [name, boundaryIndex] of fileNames) {
+            if (chunk.partIndex >= boundaryIndex && boundaryIndex > 0) {
+              filename = name;
+            }
+          }
+
+          return {
+            partIndex: chunk.partIndex,
+            text: chunk.text,
+            filename: filename,
+            filenum: String(chunk.partIndex + 1).padStart(4, '0'),
+            voice: chunk.voice,
+          };
+        });
+
+        this.workerPool.addTasks(tasks);
+      });
+    } finally {
+      signal.removeEventListener('abort', abortHandler);
+      this.workerPool = null;
+    }
+
+    return {
+      ...context,
+      audioMap,
+      failedTasks,
+    };
   }
 }
 

@@ -7,20 +7,19 @@
  */
 
 import type { ILogger } from './interfaces';
+import { IndexedDBNames } from '@/config/storage';
 
-const DB_NAME = 'edgetts_secure';
-const STORE_NAME = 'keys';
 const KEY_ID = 'master';
 
 let cachedKey: CryptoKey | null = null;
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(IndexedDBNames.secureDb, 1);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore(STORE_NAME);
+      request.result.createObjectStore(IndexedDBNames.keysStore);
     };
   });
 }
@@ -32,8 +31,8 @@ async function getOrCreateKey(): Promise<CryptoKey> {
 
   // Try to get existing key
   const existing = await new Promise<CryptoKey | undefined>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const request = tx.objectStore(STORE_NAME).get(KEY_ID);
+    const tx = db.transaction(IndexedDBNames.keysStore, 'readonly');
+    const request = tx.objectStore(IndexedDBNames.keysStore).get(KEY_ID);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
   });
@@ -53,8 +52,8 @@ async function getOrCreateKey(): Promise<CryptoKey> {
 
   // Store in IndexedDB
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const request = tx.objectStore(STORE_NAME).put(key, KEY_ID);
+    const tx = db.transaction(IndexedDBNames.keysStore, 'readwrite');
+    const request = tx.objectStore(IndexedDBNames.keysStore).put(key, KEY_ID);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
   });

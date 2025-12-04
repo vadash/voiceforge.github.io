@@ -4,8 +4,7 @@
 import { signal, computed } from '@preact/signals';
 import type { AppSettings } from '@/state/types';
 import type { LogStore } from './LogStore';
-
-const SETTINGS_KEY = 'edgetts_settings';
+import { StorageKeys } from '@/config/storage';
 
 /**
  * Default settings values
@@ -30,7 +29,7 @@ const defaultSettings: AppSettings = {
  * Settings Store - manages user preferences
  */
 export class SettingsStore {
-  private logStore?: LogStore;
+  private readonly logStore: LogStore;
 
   // Voice settings
   readonly voice = signal<string>(defaultSettings.voice);
@@ -55,6 +54,10 @@ export class SettingsStore {
   readonly isLiteMode = signal<boolean>(defaultSettings.isLiteMode);
   readonly statusAreaWidth = signal<number>(defaultSettings.statusAreaWidth);
 
+  constructor(logStore: LogStore) {
+    this.logStore = logStore;
+  }
+
   // Computed display values
   readonly rateDisplay = computed(() =>
     this.rate.value >= 0 ? `+${this.rate.value}%` : `${this.rate.value}%`
@@ -63,12 +66,6 @@ export class SettingsStore {
   readonly pitchDisplay = computed(() =>
     this.pitch.value >= 0 ? `+${this.pitch.value}Hz` : `${this.pitch.value}Hz`
   );
-
-  // ========== Logger Setup ==========
-
-  setLogStore(logStore: LogStore): void {
-    this.logStore = logStore;
-  }
 
   // ========== Voice Setters ==========
 
@@ -186,7 +183,7 @@ export class SettingsStore {
       silenceRemovalEnabled: this.silenceRemovalEnabled.value,
       normalizationEnabled: this.normalizationEnabled.value,
     };
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(StorageKeys.settings, JSON.stringify(settings));
   }
 
   /**
@@ -194,7 +191,7 @@ export class SettingsStore {
    */
   load(): void {
     try {
-      const saved = localStorage.getItem(SETTINGS_KEY);
+      const saved = localStorage.getItem(StorageKeys.settings);
       if (saved) {
         const settings: Partial<AppSettings> = JSON.parse(saved);
 
@@ -213,12 +210,11 @@ export class SettingsStore {
         this.normalizationEnabled.value = settings.normalizationEnabled ?? defaultSettings.normalizationEnabled;
       }
     } catch (e) {
-      const errorMsg = 'Failed to load settings';
-      if (this.logStore) {
-        this.logStore.error(errorMsg, e instanceof Error ? e : undefined, e instanceof Error ? undefined : { error: String(e) });
-      } else {
-        console.error(errorMsg, e);
-      }
+      this.logStore.error(
+        'Failed to load settings',
+        e instanceof Error ? e : undefined,
+        e instanceof Error ? undefined : { error: String(e) }
+      );
     }
   }
 
@@ -267,6 +263,6 @@ export class SettingsStore {
 /**
  * Create a new SettingsStore instance
  */
-export function createSettingsStore(): SettingsStore {
-  return new SettingsStore();
+export function createSettingsStore(logStore: LogStore): SettingsStore {
+  return new SettingsStore(logStore);
 }

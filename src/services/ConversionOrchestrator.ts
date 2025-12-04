@@ -12,21 +12,17 @@ import type {
   IWorkerPoolFactory,
   IAudioMergerFactory,
   IVoiceAssignerFactory,
-  IVoicePoolBuilder,
 } from '@/services/interfaces';
 import type { IPipelineRunner, PipelineContext, PipelineProgress } from '@/services/pipeline/types';
 import type { ProcessedBook, TTSConfig as VoiceConfig } from '@/state/types';
 import {
-  CharacterExtractionStep,
-  VoiceAssignmentStep,
-  SpeakerAssignmentStep,
-  TextSanitizationStep,
-  DictionaryProcessingStep,
-  TTSConversionStep,
-  AudioMergeStep,
-  SaveStep,
-} from './pipeline/steps';
-import { AppError, conversionCancelledError, noContentError } from '@/errors';
+  pipelineConfig,
+  buildPipelineFromConfig,
+  createDefaultStepRegistry,
+  StepNames,
+  type StepRegistry,
+} from './pipeline';
+import { AppError, noContentError } from '@/errors';
 
 /**
  * Orchestrates the full TTS conversion workflow using pipeline architecture
@@ -40,6 +36,7 @@ export class ConversionOrchestrator {
   private workerPoolFactory: IWorkerPoolFactory;
   private audioMergerFactory: IAudioMergerFactory;
   private voiceAssignerFactory: IVoiceAssignerFactory;
+  private stepRegistry: StepRegistry;
 
   constructor(
     private container: ServiceContainer,
@@ -52,6 +49,7 @@ export class ConversionOrchestrator {
     this.workerPoolFactory = container.get<IWorkerPoolFactory>(ServiceTypes.WorkerPoolFactory);
     this.audioMergerFactory = container.get<IAudioMergerFactory>(ServiceTypes.AudioMergerFactory);
     this.voiceAssignerFactory = container.get<IVoiceAssignerFactory>(ServiceTypes.VoiceAssignerFactory);
+    this.stepRegistry = createDefaultStepRegistry();
   }
 
   /**
@@ -137,75 +135,62 @@ export class ConversionOrchestrator {
    */
   private buildPipeline(): IPipelineRunner {
     const pipeline = this.container.get<IPipelineRunner>(ServiceTypes.PipelineRunner);
-
     const settings = this.stores.settings;
     const llmSettings = this.stores.llm;
     const detectedLang = this.stores.data.detectedLanguage.value;
 
-    // Step 1: Character Extraction (LLM Pass 1)
-    pipeline.addStep(new CharacterExtractionStep({
-      llmOptions: {
-        apiKey: llmSettings.apiKey.value,
-        apiUrl: llmSettings.apiUrl.value,
-        model: llmSettings.model.value,
-        narratorVoice: settings.narratorVoice.value,
-        directoryHandle: this.stores.data.directoryHandle.value,
-      },
-      createLLMService: (options) => this.llmServiceFactory.create(options),
-      textBlockSplitter: this.textBlockSplitter,
-    }));
-
-    // Step 2: Voice Assignment
-    pipeline.addStep(new VoiceAssignmentStep({
+    // Build step options
+    const llmOptions = {
+      apiKey: llmSettings.apiKey.value,
+      apiUrl: llmSettings.apiUrl.value,
+      model: llmSettings.model.value,
       narratorVoice: settings.narratorVoice.value,
-      detectedLanguage: detectedLang,
-      createVoiceAssigner: (narratorVoice, locale) =>
-        this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale),
-    }));
+      directoryHandle: this.stores.data.directoryHandle.value,
+    };
 
-    // Step 3: Speaker Assignment (LLM Pass 2)
-    pipeline.addStep(new SpeakerAssignmentStep({
-      llmOptions: {
-        apiKey: llmSettings.apiKey.value,
-        apiUrl: llmSettings.apiUrl.value,
-        model: llmSettings.model.value,
+    // Build pipeline configuration declaratively
+    const config = pipelineConfig()
+      .addStep(StepNames.CHARACTER_EXTRACTION, {
+        llmOptions,
+        createLLMService: (options: typeof llmOptions) => this.llmServiceFactory.create(options),
+        textBlockSplitter: this.textBlockSplitter,
+      })
+      .addStep(StepNames.VOICE_ASSIGNMENT, {
         narratorVoice: settings.narratorVoice.value,
-        directoryHandle: this.stores.data.directoryHandle.value,
-      },
-      createLLMService: (options) => this.llmServiceFactory.create(options),
-      textBlockSplitter: this.textBlockSplitter,
-    }));
+        detectedLanguage: detectedLang,
+        createVoiceAssigner: (narratorVoice: string, locale: string) =>
+          this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale),
+      })
+      .addStep(StepNames.SPEAKER_ASSIGNMENT, {
+        llmOptions,
+        createLLMService: (options: typeof llmOptions) => this.llmServiceFactory.create(options),
+        textBlockSplitter: this.textBlockSplitter,
+      })
+      .addStep(StepNames.TEXT_SANITIZATION, {})
+      .addStep(StepNames.DICTIONARY_PROCESSING, {
+        caseSensitive: settings.lexxRegister.value,
+      })
+      .addStep(StepNames.TTS_CONVERSION, {
+        maxWorkers: settings.maxThreads.value,
+        ttsConfig: this.buildTTSConfig(),
+        createWorkerPool: (options: Parameters<typeof this.workerPoolFactory.create>[0]) =>
+          this.workerPoolFactory.create(options),
+      })
+      .addStep(StepNames.AUDIO_MERGE, {
+        outputFormat: settings.outputFormat.value,
+        silenceRemoval: settings.silenceRemovalEnabled.value,
+        normalization: settings.normalizationEnabled.value,
+        ffmpegService: this.ffmpegService,
+        createAudioMerger: (config: Parameters<typeof this.audioMergerFactory.create>[0]) =>
+          this.audioMergerFactory.create(config),
+      })
+      .addStep(StepNames.SAVE, {
+        createAudioMerger: (config: Parameters<typeof this.audioMergerFactory.create>[0]) =>
+          this.audioMergerFactory.create(config),
+      })
+      .build();
 
-    // Step 4: Text Sanitization
-    pipeline.addStep(new TextSanitizationStep());
-
-    // Step 5: Dictionary Processing
-    pipeline.addStep(new DictionaryProcessingStep({
-      caseSensitive: settings.lexxRegister.value,
-    }));
-
-    // Step 6: TTS Conversion
-    pipeline.addStep(new TTSConversionStep({
-      maxWorkers: settings.maxThreads.value,
-      ttsConfig: this.buildTTSConfig(),
-      createWorkerPool: (options) => this.workerPoolFactory.create(options),
-    }));
-
-    // Step 7: Audio Merge
-    pipeline.addStep(new AudioMergeStep({
-      outputFormat: settings.outputFormat.value,
-      silenceRemoval: settings.silenceRemovalEnabled.value,
-      normalization: settings.normalizationEnabled.value,
-      ffmpegService: this.ffmpegService,
-      createAudioMerger: (config) => this.audioMergerFactory.create(config),
-    }));
-
-    // Step 8: Save
-    pipeline.addStep(new SaveStep({
-      createAudioMerger: (config) => this.audioMergerFactory.create(config),
-    }));
-
-    return pipeline;
+    return buildPipelineFromConfig(config, this.stepRegistry, pipeline);
   }
 
   /**
@@ -216,41 +201,41 @@ export class ConversionOrchestrator {
 
     // Update store status based on step
     switch (progress.step) {
-      case 'character-extraction':
+      case StepNames.CHARACTER_EXTRACTION:
         this.stores.conversion.setStatus('llm-pass1');
         this.stores.llm.setProcessingStatus('pass1');
         this.stores.llm.setBlockProgress(progress.current, progress.total);
         break;
 
-      case 'voice-assignment':
+      case StepNames.VOICE_ASSIGNMENT:
         // Short step, no special status
         break;
 
-      case 'speaker-assignment':
+      case StepNames.SPEAKER_ASSIGNMENT:
         this.stores.conversion.setStatus('llm-pass2');
         this.stores.llm.setProcessingStatus('pass2');
         this.stores.llm.setBlockProgress(progress.current, progress.total);
         break;
 
-      case 'text-sanitization':
+      case StepNames.TEXT_SANITIZATION:
         // Short step, no special status
         break;
 
-      case 'dictionary-processing':
+      case StepNames.DICTIONARY_PROCESSING:
         // Short step, no special status
         break;
 
-      case 'tts-conversion':
+      case StepNames.TTS_CONVERSION:
         this.stores.conversion.setStatus('converting');
         this.stores.llm.setProcessingStatus('idle');
         this.stores.conversion.updateProgress(progress.current, progress.total);
         break;
 
-      case 'audio-merge':
+      case StepNames.AUDIO_MERGE:
         this.stores.conversion.setStatus('merging');
         break;
 
-      case 'save':
+      case StepNames.SAVE:
         // Covered by merging status
         break;
     }

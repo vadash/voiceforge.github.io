@@ -3,12 +3,15 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SettingsStore } from '@/stores/SettingsStore';
+import { LogStore } from '@/stores/LogStore';
 
 describe('SettingsStore', () => {
   let store: SettingsStore;
+  let logStore: LogStore;
 
   beforeEach(() => {
-    store = new SettingsStore();
+    logStore = new LogStore();
+    store = new SettingsStore(logStore);
     localStorage.clear();
   });
 

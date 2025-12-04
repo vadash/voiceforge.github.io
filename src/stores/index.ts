@@ -26,8 +26,6 @@ export {
   useData,
   useLanguage,
   createStores,
-  createTestStores,
   initializeStores,
   type Stores,
-  type TestStoresState,
 } from './StoreContext';

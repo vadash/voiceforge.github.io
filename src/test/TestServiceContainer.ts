@@ -134,10 +134,5 @@ export function createTestContainer(options: TestContainerOptions = {}): {
     }
   );
 
-  // Legacy registrations for backward compatibility
-  container.registerTransient(ServiceTypes.TTSService, () => mocks.tts);
-  container.registerTransient(ServiceTypes.WorkerPool, () => mocks.workerPool);
-  container.registerInstance(ServiceTypes.LLMService, mocks.llm);
-
   return { container, mocks };
 }

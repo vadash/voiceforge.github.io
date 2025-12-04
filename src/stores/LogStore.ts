@@ -41,11 +41,6 @@ export class LogStore implements ILogger {
   // ========== Computed Properties ==========
 
   /**
-   * Get all entries
-   */
-  readonly all = computed(() => this.entries.value);
-
-  /**
    * Get filtered entries based on filter level
    */
   readonly filtered = computed(() => {
@@ -55,62 +50,42 @@ export class LogStore implements ILogger {
   });
 
   /**
-   * Get error entries only
+   * Counts by level (single computed for all level counts)
    */
-  readonly errors = computed(() =>
-    this.entries.value.filter(e => e.level === 'error')
-  );
-
-  /**
-   * Get warning entries only
-   */
-  readonly warnings = computed(() =>
-    this.entries.value.filter(e => e.level === 'warn')
-  );
-
-  /**
-   * Get info entries only
-   */
-  readonly infos = computed(() =>
-    this.entries.value.filter(e => e.level === 'info')
-  );
-
-  /**
-   * Get debug entries only
-   */
-  readonly debugs = computed(() =>
-    this.entries.value.filter(e => e.level === 'debug')
-  );
-
-  /**
-   * Get entry count
-   */
-  readonly count = computed(() => this.entries.value.length);
-
-  /**
-   * Get error count
-   */
-  readonly errorCount = computed(() => this.errors.value.length);
-
-  /**
-   * Get warning count
-   */
-  readonly warningCount = computed(() => this.warnings.value.length);
-
-  /**
-   * Get info count
-   */
-  readonly infoCount = computed(() => this.infos.value.length);
-
-  /**
-   * Get debug count
-   */
-  readonly debugCount = computed(() => this.debugs.value.length);
+  readonly counts = computed(() => {
+    const entries = this.entries.value;
+    const counts = { error: 0, warn: 0, info: 0, debug: 0 };
+    for (const entry of entries) {
+      counts[entry.level]++;
+    }
+    return counts;
+  });
 
   /**
    * Check if there are any entries
    */
   readonly hasEntries = computed(() => this.entries.value.length > 0);
+
+  /**
+   * Total entry count
+   */
+  readonly count = computed(() => this.entries.value.length);
+
+  // ========== Level Access Methods ==========
+
+  /**
+   * Get entries by level
+   */
+  getByLevel(level: LogLevel): LogEntry[] {
+    return this.entries.value.filter(e => e.level === level);
+  }
+
+  /**
+   * Get count by level
+   */
+  countByLevel(level: LogLevel): number {
+    return this.counts.value[level];
+  }
 
   // ========== Actions ==========
 

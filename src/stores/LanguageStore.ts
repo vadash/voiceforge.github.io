@@ -2,8 +2,7 @@
 // Manages application language/locale settings
 
 import { signal, computed } from '@preact/signals';
-
-const LANGUAGE_KEY = 'edgetts_language';
+import { StorageKeys } from '@/config/storage';
 
 /**
  * Supported locales
@@ -52,14 +51,14 @@ export class LanguageStore {
    * Save to localStorage
    */
   save(): void {
-    localStorage.setItem(LANGUAGE_KEY, this.locale.value);
+    localStorage.setItem(StorageKeys.language, this.locale.value);
   }
 
   /**
    * Load from localStorage
    */
   load(): void {
-    const saved = localStorage.getItem(LANGUAGE_KEY);
+    const saved = localStorage.getItem(StorageKeys.language);
     if (saved === 'en' || saved === 'ru') {
       this.locale.value = saved;
     } else {

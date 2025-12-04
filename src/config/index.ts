@@ -147,10 +147,6 @@ export const defaultConfig: AppConfig = {
   },
 };
 
-// Windows epoch for Sec-MS-GEC generation
-export const WIN_EPOCH = 11644473600;
-export const S_TO_NS = 1e9;
-
 /**
  * Load configuration with localStorage overrides (if needed in future)
  */

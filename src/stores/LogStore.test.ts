@@ -71,29 +71,27 @@ describe('LogStore', () => {
       store.add('warn', 'Warning 2');
     });
 
-    it('errors should return only error entries', () => {
-      expect(store.errors.value).toHaveLength(1);
-      expect(store.errors.value[0].message).toBe('Error 1');
-    });
-
-    it('warnings should return only warn entries', () => {
-      expect(store.warnings.value).toHaveLength(2);
-    });
-
-    it('infos should return only info entries', () => {
-      expect(store.infos.value).toHaveLength(2);
+    it('getByLevel should return only entries of that level', () => {
+      expect(store.getByLevel('error')).toHaveLength(1);
+      expect(store.getByLevel('error')[0].message).toBe('Error 1');
+      expect(store.getByLevel('warn')).toHaveLength(2);
+      expect(store.getByLevel('info')).toHaveLength(2);
     });
 
     it('count should return total entries', () => {
       expect(store.count.value).toBe(5);
     });
 
-    it('errorCount should return error count', () => {
-      expect(store.errorCount.value).toBe(1);
+    it('counts should return all level counts', () => {
+      expect(store.counts.value.error).toBe(1);
+      expect(store.counts.value.warn).toBe(2);
+      expect(store.counts.value.info).toBe(2);
+      expect(store.counts.value.debug).toBe(0);
     });
 
-    it('warningCount should return warning count', () => {
-      expect(store.warningCount.value).toBe(2);
+    it('countByLevel should return count for specific level', () => {
+      expect(store.countByLevel('error')).toBe(1);
+      expect(store.countByLevel('warn')).toBe(2);
     });
   });
 

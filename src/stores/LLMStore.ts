@@ -5,8 +5,7 @@ import { signal, computed } from '@preact/signals';
 import type { LLMCharacter } from '@/state/types';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
 import type { LogStore } from './LogStore';
-
-const LLM_SETTINGS_KEY = 'edgetts_llm_settings';
+import { StorageKeys } from '@/config/storage';
 
 /**
  * LLM processing status
@@ -37,7 +36,7 @@ const defaultLLMSettings = {
  * LLM Store - manages LLM settings and character data
  */
 export class LLMStore {
-  private logStore?: LogStore;
+  private readonly logStore: LogStore;
 
   // Settings (persisted)
   readonly enabled = signal<boolean>(defaultLLMSettings.enabled);
@@ -54,6 +53,10 @@ export class LLMStore {
   // Character data
   readonly detectedCharacters = signal<LLMCharacter[]>([]);
   readonly characterVoiceMap = signal<Map<string, string>>(new Map());
+
+  constructor(logStore: LogStore) {
+    this.logStore = logStore;
+  }
 
   // ========== Computed Properties ==========
 
@@ -84,12 +87,6 @@ export class LLMStore {
   readonly characterNames = computed(() =>
     this.detectedCharacters.value.map(c => c.canonicalName)
   );
-
-  // ========== Logger Setup ==========
-
-  setLogStore(logStore: LogStore): void {
-    this.logStore = logStore;
-  }
 
   // ========== Settings Actions ==========
 
@@ -215,14 +212,13 @@ export class LLMStore {
         apiUrl: this.apiUrl.value,
         model: this.model.value,
       };
-      localStorage.setItem(LLM_SETTINGS_KEY, JSON.stringify(settings));
+      localStorage.setItem(StorageKeys.llmSettings, JSON.stringify(settings));
     } catch (e) {
-      const errorMsg = 'Failed to save LLM settings';
-      if (this.logStore) {
-        this.logStore.error(errorMsg, e instanceof Error ? e : undefined, e instanceof Error ? undefined : { error: String(e) });
-      } else {
-        console.error(errorMsg, e);
-      }
+      this.logStore.error(
+        'Failed to save LLM settings',
+        e instanceof Error ? e : undefined,
+        e instanceof Error ? undefined : { error: String(e) }
+      );
     }
   }
 
@@ -231,7 +227,7 @@ export class LLMStore {
    */
   async loadSettings(): Promise<void> {
     try {
-      const saved = localStorage.getItem(LLM_SETTINGS_KEY);
+      const saved = localStorage.getItem(StorageKeys.llmSettings);
       if (saved) {
         const settings: LLMSettings = JSON.parse(saved);
         this.enabled.value = settings.enabled ?? defaultLLMSettings.enabled;
@@ -240,12 +236,11 @@ export class LLMStore {
         this.model.value = settings.model ?? defaultLLMSettings.model;
       }
     } catch (e) {
-      const errorMsg = 'Failed to load LLM settings';
-      if (this.logStore) {
-        this.logStore.error(errorMsg, e instanceof Error ? e : undefined, e instanceof Error ? undefined : { error: String(e) });
-      } else {
-        console.error(errorMsg, e);
-      }
+      this.logStore.error(
+        'Failed to load LLM settings',
+        e instanceof Error ? e : undefined,
+        e instanceof Error ? undefined : { error: String(e) }
+      );
     }
   }
 }
@@ -253,6 +248,6 @@ export class LLMStore {
 /**
  * Create a new LLMStore instance
  */
-export function createLLMStore(): LLMStore {
-  return new LLMStore();
+export function createLLMStore(logStore: LogStore): LLMStore {
+  return new LLMStore(logStore);
 }

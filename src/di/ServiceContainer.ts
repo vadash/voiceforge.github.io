@@ -5,18 +5,11 @@
  * Service tokens for dependency injection
  */
 export const ServiceTypes = {
-  // Core services
-  TTSService: Symbol.for('ITTSService'),
-  WorkerPool: Symbol.for('IWorkerPool'),
-  AudioMerger: Symbol.for('IAudioMerger'),
-  LLMService: Symbol.for('ILLMService'),
+  // Core singleton services
   FFmpegService: Symbol.for('IFFmpegService'),
   Logger: Symbol.for('ILogger'),
   SecureStorage: Symbol.for('ISecureStorage'),
-  VoiceAssigner: Symbol.for('IVoiceAssigner'),
   FileConverter: Symbol.for('IFileConverter'),
-
-  // New services for pipeline
   TextBlockSplitter: Symbol.for('ITextBlockSplitter'),
   VoicePoolBuilder: Symbol.for('IVoicePoolBuilder'),
   PipelineRunner: Symbol.for('IPipelineRunner'),
@@ -141,16 +134,6 @@ export class ServiceContainer {
   }
 
   /**
-   * Try to get a service, returning undefined if not registered
-   */
-  tryGet<T>(token: symbol): T | undefined {
-    if (!this.has(token)) {
-      return undefined;
-    }
-    return this.get<T>(token);
-  }
-
-  /**
    * Check if a service is registered
    */
   has(token: symbol): boolean {
@@ -170,28 +153,6 @@ export class ServiceContainer {
   clear(): void {
     this.registrations.clear();
     this.resolving.clear();
-  }
-
-  /**
-   * Create a child container that inherits registrations
-   * Child can override parent registrations
-   */
-  createChild(): ServiceContainer {
-    const child = new ServiceContainer();
-
-    // Copy all registrations to child
-    for (const [token, registration] of this.registrations) {
-      child.registrations.set(token, { ...registration });
-    }
-
-    return child;
-  }
-
-  /**
-   * Get all registered tokens
-   */
-  getRegisteredTokens(): symbol[] {
-    return Array.from(this.registrations.keys());
   }
 }
 

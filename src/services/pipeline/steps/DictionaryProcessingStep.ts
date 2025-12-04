@@ -83,9 +83,14 @@ export class DictionaryProcessingStep extends BasePipelineStep {
     // Regex rule: regex"pattern"="replacement"
     const regexMatch = rule.match(/^regex"(.*)"="(.*)"/);
     if (regexMatch) {
-      const regex = new RegExp(regexMatch[1], 'g');
-      const replacement = regexMatch[2].replace(/\\r/g, '\r').replace(/\\n/g, '\n');
-      return text.replace(regex, replacement);
+      try {
+        const regex = new RegExp(regexMatch[1], 'g');
+        const replacement = regexMatch[2].replace(/\\r/g, '\r').replace(/\\n/g, '\n');
+        return text.replace(regex, replacement);
+      } catch {
+        // Invalid regex pattern - skip this rule
+        return text;
+      }
     }
 
     // Skip empty rules
@@ -100,8 +105,13 @@ export class DictionaryProcessingStep extends BasePipelineStep {
         if (this.options.caseSensitive) {
           return text.replaceAll(matchArr[0], matchArr[1]);
         } else {
-          const regex = new RegExp(this.escapeRegex(matchArr[0]), 'giu');
-          return text.replace(regex, matchArr[1]);
+          try {
+            const regex = new RegExp(this.escapeRegex(matchArr[0]), 'giu');
+            return text.replace(regex, matchArr[1]);
+          } catch {
+            // Invalid regex - skip this rule
+            return text;
+          }
         }
       }
     }
@@ -109,9 +119,14 @@ export class DictionaryProcessingStep extends BasePipelineStep {
     // Word boundary match: pattern=replacement
     const matchArr = rule.trim().split('=');
     if (matchArr.length === 2) {
-      const escaped = this.escapeRegex(matchArr[0]);
-      const regex = new RegExp(`(^|\\s|\\p{P})${escaped}(?=\\p{P}|\\s|$)`, 'giu');
-      return text.replace(regex, `$1${matchArr[1]}`);
+      try {
+        const escaped = this.escapeRegex(matchArr[0]);
+        const regex = new RegExp(`(^|\\s|\\p{P})${escaped}(?=\\p{P}|\\s|$)`, 'giu');
+        return text.replace(regex, `$1${matchArr[1]}`);
+      } catch {
+        // Invalid regex - skip this rule
+        return text;
+      }
     }
 
     return text;

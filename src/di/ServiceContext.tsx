@@ -5,6 +5,7 @@ import { createContext, ComponentChildren } from 'preact';
 import { useContext, useMemo } from 'preact/hooks';
 import { ServiceContainer, ServiceTypes, createContainer } from './ServiceContainer';
 import { defaultConfig, type AppConfig } from '@/config';
+import { StorageKeys } from '@/config/storage';
 
 // Import service implementations
 // Note: EdgeTTSService, TTSWorkerPool, AudioMerger, LLMVoiceService,
@@ -139,7 +140,6 @@ class ConsoleLogger implements ILogger {
  * Adapter wrapping the existing SecureStorage functions
  */
 class SecureStorageAdapter implements ISecureStorage {
-  private static readonly STORAGE_KEY = 'llm_api_key_encrypted';
   private logger?: ILogger;
 
   constructor(logger?: ILogger) {
@@ -148,17 +148,17 @@ class SecureStorageAdapter implements ISecureStorage {
 
   async saveApiKey(key: string): Promise<void> {
     const encrypted = await encryptValue(key);
-    localStorage.setItem(SecureStorageAdapter.STORAGE_KEY, encrypted);
+    localStorage.setItem(StorageKeys.encryptedApiKey, encrypted);
   }
 
   async loadApiKey(): Promise<string> {
-    const encrypted = localStorage.getItem(SecureStorageAdapter.STORAGE_KEY);
+    const encrypted = localStorage.getItem(StorageKeys.encryptedApiKey);
     if (!encrypted) return '';
     return decryptValue(encrypted, this.logger);
   }
 
   async clearApiKey(): Promise<void> {
-    localStorage.removeItem(SecureStorageAdapter.STORAGE_KEY);
+    localStorage.removeItem(StorageKeys.encryptedApiKey);
   }
 }
 

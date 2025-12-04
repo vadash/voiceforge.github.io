@@ -14,10 +14,7 @@ export function StatusArea() {
   const { current, total } = conversion.progress.value;
   const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
   const filter = logs.filterLevel.value;
-  const errorCount = logs.errorCount.value;
-  const warningCount = logs.warningCount.value;
-  const infoCount = logs.infoCount.value;
-  const debugCount = logs.debugCount.value;
+  const { error: errorCount, warn: warningCount, info: infoCount, debug: debugCount } = logs.counts.value;
 
   // Get filtered entries
   const entries = logs.filtered.value;

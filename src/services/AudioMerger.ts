@@ -51,7 +51,20 @@ export class AudioMerger implements IAudioMerger {
   }
 
   /**
-   * Estimate duration from MP3 bytes (96kbps = 12 bytes/ms)
+   * Estimate duration from MP3 bytes.
+   *
+   * HEURISTIC: Assumes 96kbps constant bitrate audio (Edge TTS default output).
+   * At 96kbps: 96000 bits/sec = 12000 bytes/sec = 12 bytes/ms
+   *
+   * This is an approximation and may be inaccurate for:
+   * - Variable bitrate (VBR) audio
+   * - Audio with different sample rates
+   * - Heavily compressed or expanded audio
+   *
+   * The heuristic is acceptable here because:
+   * - Edge TTS consistently outputs 96kbps MP3
+   * - Merge boundaries don't need to be exact (±10% tolerance)
+   * - Actual duration is recalculated after FFmpeg processing if needed
    */
   private estimateDurationMs(bytes: number): number {
     return Math.round(bytes / defaultConfig.audio.bytesPerMs);

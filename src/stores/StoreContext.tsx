@@ -124,12 +124,8 @@ export function useLanguage(): LanguageStore {
  */
 export function createStores(): Stores {
   const logs = createLogStore();
-  const settings = createSettingsStore();
-  const llm = createLLMStore();
-
-  // Connect logger to stores that need it
-  settings.setLogStore(logs);
-  llm.setLogStore(logs);
+  const settings = createSettingsStore(logs);
+  const llm = createLLMStore(logs);
 
   return {
     settings,
@@ -139,36 +135,6 @@ export function createStores(): Stores {
     data: createDataStore(),
     language: createLanguageStore(),
   };
-}
-
-/**
- * Initial state for test stores
- */
-export interface TestStoresState {
-  settings?: Partial<ReturnType<SettingsStore['toObject']>>;
-  // Add more as needed
-}
-
-/**
- * Create stores for testing with optional initial state
- */
-export function createTestStores(initialState?: TestStoresState): Stores {
-  const stores = createStores();
-
-  // Apply initial state if provided
-  if (initialState?.settings) {
-    const s = stores.settings;
-    const init = initialState.settings;
-
-    if (init.voice !== undefined) s.voice.value = init.voice;
-    if (init.narratorVoice !== undefined) s.narratorVoice.value = init.narratorVoice;
-    if (init.rate !== undefined) s.rate.value = init.rate;
-    if (init.pitch !== undefined) s.pitch.value = init.pitch;
-    if (init.maxThreads !== undefined) s.maxThreads.value = init.maxThreads;
-    if (init.outputFormat !== undefined) s.outputFormat.value = init.outputFormat;
-  }
-
-  return stores;
 }
 
 /**

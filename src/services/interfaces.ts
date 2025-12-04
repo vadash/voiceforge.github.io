@@ -293,19 +293,6 @@ export interface ISecureStorage {
 }
 
 // ============================================================================
-// Text Processing Interfaces
-// ============================================================================
-
-/**
- * Dictionary rule for text replacement
- */
-export interface DictionaryRule {
-  type: 'regex' | 'exact' | 'word';
-  pattern: string;
-  replacement: string;
-}
-
-// ============================================================================
 // Voice Assignment Interfaces
 // ============================================================================
 

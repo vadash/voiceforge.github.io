@@ -3,9 +3,13 @@
 
 import { sha256 } from '../utils/sha256';
 import { generateConnectionId } from '../utils/uuid';
-import { defaultConfig, WIN_EPOCH, S_TO_NS } from '@/config';
+import { defaultConfig } from '@/config';
 import type { TTSConfig, StatusUpdate } from '../state/types';
 import type { ILogger } from './interfaces';
+
+// Windows epoch for Sec-MS-GEC generation (only used in this service)
+const WIN_EPOCH = 11644473600;
+const S_TO_NS = 1e9;
 
 export interface TTSWorkerOptions {
   indexPart: number;
