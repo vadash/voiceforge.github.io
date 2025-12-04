@@ -14,7 +14,7 @@ import {
   type Pass1Result,
   type Pass2Result,
 } from './llm-test-helpers';
-import type { LLMVoiceService } from '@/services/LLMVoiceService';
+import type { LLMVoiceService } from '@/services/llm';
 import type { TextBlockSplitter } from '@/services/TextBlockSplitter';
 
 /**

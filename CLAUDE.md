@@ -49,11 +49,13 @@ The conversion pipeline uses composable steps:
 Optional feature for multi-voice audiobooks using LLM-based character detection:
 
 - **TextBlockSplitter**: Splits text into sentences and blocks for LLM processing. Uses 16k token blocks for Pass 1, 8k for Pass 2.
-- **LLMVoiceService**: Two-pass LLM system using OpenAI-compatible API:
-  - Pass 1: Extracts characters from text (sequential processing, detects gender/name variations)
-  - Pass 2: Assigns speakers to sentences (parallel)
+- **LLMVoiceService** (`src/services/llm/`): Three-pass LLM system using OpenAI-compatible API:
+  - **Extract** (Pass 1): Extracts characters from text blocks (sequential processing, detects gender/name variations)
+  - **Merge**: Deduplicates characters across blocks using LLM (identifies same person with different names)
+  - **Assign** (Pass 2): Assigns speakers to sentences (parallel, up to 20 concurrent)
   - Uses sparse output format with character codes (A-Z, 0-9, a-z) for token reduction
   - Infinite retry with exponential backoff
+  - Logs requests/responses to: `logs/extract_*.json`, `logs/merge_*.json`, `logs/assign_*.json`
 - **VoiceAssigner**: Assigns unique voices to characters based on detected gender, avoiding duplicates.
 - **VoicePoolBuilder**: Builds voice pools filtered by locale/gender (ru-*, en-*, multilingual voices).
 

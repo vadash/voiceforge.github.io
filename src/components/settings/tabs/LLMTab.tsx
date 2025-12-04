@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
-import { LLMVoiceService } from '@/services/LLMVoiceService';
+import { LLMVoiceService } from '@/services/llm';
 import { Button } from '@/components/common';
 import { LLMHelp } from './LLMHelp';
 

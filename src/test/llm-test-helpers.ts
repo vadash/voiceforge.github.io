@@ -1,4 +1,4 @@
-import { LLMVoiceService } from '@/services/LLMVoiceService';
+import { LLMVoiceService } from '@/services/llm';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { testConfig } from '../../test.config.local';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';

@@ -16,7 +16,7 @@ import { encryptValue, decryptValue } from '@/services/SecureStorage';
 import { LoggerService } from '@/services/LoggerService';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
-import { LLMVoiceService } from '@/services/LLMVoiceService';
+import { LLMVoiceService } from '@/services/llm';
 import { TTSWorkerPool } from '@/services/TTSWorkerPool';
 import { AudioMerger } from '@/services/AudioMerger';
 import { VoiceAssigner } from '@/services/VoiceAssigner';
