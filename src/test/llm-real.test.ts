@@ -104,7 +104,7 @@ describe('LLM Real API Tests', () => {
 
       it('should attribute dialogue lines correctly', () => {
         const results = fixture.expectedDialogueLines.map(expected =>
-          checkDialogue(pass2Result.assignments, expected)
+          checkDialogue(pass2Result.assignments, expected, pass1Result.characters)
         );
 
         logDialogueChecks(results);

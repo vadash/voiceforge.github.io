@@ -3,6 +3,7 @@ import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { testConfig } from '../../test.config.local';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import type { TestFixture, ExpectedDialogue } from './fixtures';
+import { speakerMatchesCharacter } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -157,10 +158,12 @@ export function findAssignment(
 
 /**
  * Check dialogue line attribution
+ * Uses character variations/aliases for matching when characters are provided
  */
 export function checkDialogue(
   assignments: SpeakerAssignment[],
-  expected: ExpectedDialogue
+  expected: ExpectedDialogue,
+  characters?: LLMCharacter[]
 ): DialogueCheckResult {
   const assignment = findAssignment(assignments, expected.textContains);
 
@@ -174,9 +177,16 @@ export function checkDialogue(
     };
   }
 
-  const actualLower = assignment.speaker.toLowerCase();
-  const expectedLower = expected.speaker.toLowerCase();
-  const matched = actualLower.includes(expectedLower) || expectedLower.includes(actualLower);
+  let matched: boolean;
+  if (characters && characters.length > 0) {
+    // Use alias-aware matching
+    matched = speakerMatchesCharacter(assignment.speaker, expected.speaker, characters);
+  } else {
+    // Fall back to simple string matching
+    const actualLower = assignment.speaker.toLowerCase();
+    const expectedLower = expected.speaker.toLowerCase();
+    matched = actualLower.includes(expectedLower) || expectedLower.includes(actualLower);
+  }
 
   return {
     expected,
