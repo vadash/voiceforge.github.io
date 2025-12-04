@@ -564,22 +564,26 @@ ${numberedSentences}
   }
 
   /**
-   * Extract JSON from response (handles markdown code blocks)
+   * Extract JSON from response (handles markdown code blocks and thinking tags)
    */
   private extractJSON(content: string): string {
+    // Remove thinking tags (used by some LLMs like DeepSeek)
+    let cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    cleaned = cleaned.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+
     // Try to extract from markdown code block
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
       return jsonMatch[1].trim();
     }
 
     // Try to find raw JSON object
-    const objectMatch = content.match(/\{[\s\S]*\}/);
+    const objectMatch = cleaned.match(/\{[\s\S]*\}/);
     if (objectMatch) {
       return objectMatch[0];
     }
 
-    return content.trim();
+    return cleaned.trim();
   }
 
   /**
