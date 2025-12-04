@@ -5,6 +5,7 @@ import { useCallback, useRef } from 'preact/hooks';
 import { useServices } from '@/di';
 import { useStores } from '@/stores';
 import { ConversionOrchestrator } from '@/services/ConversionOrchestrator';
+import { getKeepAwake } from '@/services/KeepAwake';
 import type { ProcessedBook } from '@/state/types';
 
 /**
@@ -51,6 +52,10 @@ export function useTTSConversion(): UseTTSConversionResult {
     // Create new orchestrator
     orchestratorRef.current = new ConversionOrchestrator(container, stores);
 
+    // Start keep-awake to prevent background throttling
+    const keepAwake = getKeepAwake();
+    keepAwake.start();
+
     try {
       await orchestratorRef.current.run(text, existingBook);
     } catch (error) {
@@ -59,6 +64,9 @@ export function useTTSConversion(): UseTTSConversionResult {
       if (stores.conversion.isProcessing.value) {
         stores.conversion.setError((error as Error).message);
       }
+    } finally {
+      // Stop keep-awake when conversion ends
+      keepAwake.stop();
     }
   }, [container, stores]);
 
