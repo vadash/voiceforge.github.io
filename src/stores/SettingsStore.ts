@@ -13,6 +13,7 @@ const defaultSettings: AppSettings = {
   voice: 'ru-RU, DmitryNeural',
   narratorVoice: 'ru-RU, DmitryNeural',
   voicePoolLocale: 'ru-RU',
+  enabledVoices: [], // Empty means all voices enabled
   rate: 0,
   pitch: 0,
   maxThreads: 20,
@@ -35,6 +36,7 @@ export class SettingsStore {
   readonly voice = signal<string>(defaultSettings.voice);
   readonly narratorVoice = signal<string>(defaultSettings.narratorVoice);
   readonly voicePoolLocale = signal<string>(defaultSettings.voicePoolLocale);
+  readonly enabledVoices = signal<string[]>(defaultSettings.enabledVoices);
 
   // Speech settings
   readonly rate = signal<number>(defaultSettings.rate);
@@ -81,6 +83,11 @@ export class SettingsStore {
 
   setVoicePoolLocale(value: string): void {
     this.voicePoolLocale.value = value;
+    this.save();
+  }
+
+  setEnabledVoices(value: string[]): void {
+    this.enabledVoices.value = value;
     this.save();
   }
 
@@ -172,6 +179,7 @@ export class SettingsStore {
       voice: this.voice.value,
       narratorVoice: this.narratorVoice.value,
       voicePoolLocale: this.voicePoolLocale.value,
+      enabledVoices: this.enabledVoices.value,
       rate: this.rate.value,
       pitch: this.pitch.value,
       maxThreads: this.maxThreads.value,
@@ -198,6 +206,7 @@ export class SettingsStore {
         this.voice.value = settings.voice ?? defaultSettings.voice;
         this.narratorVoice.value = settings.narratorVoice ?? defaultSettings.narratorVoice;
         this.voicePoolLocale.value = settings.voicePoolLocale ?? defaultSettings.voicePoolLocale;
+        this.enabledVoices.value = settings.enabledVoices ?? defaultSettings.enabledVoices;
         this.rate.value = settings.rate ?? defaultSettings.rate;
         this.pitch.value = settings.pitch ?? defaultSettings.pitch;
         this.maxThreads.value = settings.maxThreads ?? defaultSettings.maxThreads;
@@ -225,6 +234,7 @@ export class SettingsStore {
     this.voice.value = defaultSettings.voice;
     this.narratorVoice.value = defaultSettings.narratorVoice;
     this.voicePoolLocale.value = defaultSettings.voicePoolLocale;
+    this.enabledVoices.value = defaultSettings.enabledVoices;
     this.rate.value = defaultSettings.rate;
     this.pitch.value = defaultSettings.pitch;
     this.maxThreads.value = defaultSettings.maxThreads;
@@ -246,6 +256,7 @@ export class SettingsStore {
       voice: this.voice.value,
       narratorVoice: this.narratorVoice.value,
       voicePoolLocale: this.voicePoolLocale.value,
+      enabledVoices: this.enabledVoices.value,
       rate: this.rate.value,
       pitch: this.pitch.value,
       maxThreads: this.maxThreads.value,

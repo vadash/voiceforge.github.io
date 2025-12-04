@@ -64,6 +64,7 @@ export function ExportImportTab() {
       const s = importData.settings;
       if (s.voice) settings.setVoice(s.voice as string);
       if (s.narratorVoice) settings.setNarratorVoice(s.narratorVoice as string);
+      if (s.enabledVoices) settings.setEnabledVoices(s.enabledVoices as string[]);
       if (s.rate !== undefined) settings.setRate(s.rate as number);
       if (s.pitch !== undefined) settings.setPitch(s.pitch as number);
       if (s.maxThreads !== undefined) settings.setMaxThreads(s.maxThreads as number);

@@ -1,18 +1,27 @@
 import { useState, useMemo } from 'preact/hooks';
-import { signal } from '@preact/signals';
+import { signal, computed } from '@preact/signals';
 import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import { EdgeTTSService } from '@/services/EdgeTTSService';
+import { useSettings } from '@/stores';
 
-// Voice pool state - which voices are enabled
-const enabledVoices = signal<Set<string>>(new Set(voices.map(v => v.fullValue)));
 const isPlaying = signal<string | null>(null);
 const sampleText = signal<string>('Hello, this is a sample of my voice.');
 
 export function VoicePoolTab() {
+  const settings = useSettings();
   const [filter, setFilter] = useState('');
   const [localeFilter, setLocaleFilter] = useState('all');
+
+  // Get enabled voices from settings (empty array means all enabled)
+  const enabledVoices = computed(() => {
+    const saved = settings.enabledVoices.value;
+    if (saved.length === 0) {
+      return new Set(voices.map(v => v.fullValue));
+    }
+    return new Set(saved);
+  });
 
   // Get unique locales
   const locales = useMemo(() => {
@@ -20,7 +29,14 @@ export function VoicePoolTab() {
     return Array.from(unique).sort();
   }, []);
 
-  // Filter voices
+  // Filter voices for narrator selection based on detected language
+  const narratorVoices = useMemo(() => {
+    return voices.filter(v =>
+      v.locale.startsWith('ru') || v.name.includes('Multilingual')
+    );
+  }, []);
+
+  // Filter voices for pool list
   const filteredVoices = useMemo(() => {
     return voices.filter(v => {
       const matchesSearch = filter === '' ||
@@ -39,15 +55,15 @@ export function VoicePoolTab() {
     } else {
       current.add(voiceId);
     }
-    enabledVoices.value = current;
+    settings.setEnabledVoices(Array.from(current));
   };
 
   const enableAll = () => {
-    enabledVoices.value = new Set(voices.map(v => v.fullValue));
+    settings.setEnabledVoices(voices.map(v => v.fullValue));
   };
 
   const disableAll = () => {
-    enabledVoices.value = new Set();
+    settings.setEnabledVoices([]);
   };
 
   const playVoice = async (voiceId: string) => {
@@ -98,7 +114,37 @@ export function VoicePoolTab() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Narrator Voice Selection */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">
+          <Text id="settings.narratorVoice">Narrator Voice</Text>
+        </label>
+        <div className="flex gap-2">
+          <select
+            className="select-field flex-1"
+            value={settings.narratorVoice.value}
+            onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
+          >
+            {narratorVoices.map((v) => (
+              <option key={v.fullValue} value={v.fullValue}>
+                {v.fullValue} ({v.gender})
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => playVoice(settings.narratorVoice.value)}
+            disabled={isPlaying.value !== null}
+            className="btn btn-icon"
+            aria-label="Play voice sample"
+          >
+            {isPlaying.value === settings.narratorVoice.value ? '...' : '▶'}
+          </button>
+        </div>
+      </div>
+
+      <hr className="border-border" />
+
+      {/* Voice Pool Header */}
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-400">
           {enabledCount} / {totalCount} <Text id="settings.voicesEnabled">voices enabled</Text>

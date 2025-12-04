@@ -11,6 +11,7 @@ export interface AppSettings {
   voice: string;
   narratorVoice: string;
   voicePoolLocale: string;
+  enabledVoices: string[];
   rate: number;
   pitch: number;
   maxThreads: number;
