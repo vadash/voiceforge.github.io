@@ -117,7 +117,6 @@ export async function runPass2(
   characters.forEach((char, i) => {
     characterVoiceMap.set(char.canonicalName, `voice-${i}`);
   });
-  const canonicalNames = characters.map(c => c.canonicalName);
 
   if (verbose) {
     console.log(`  Pass 2: Processing ${blocks.length} block(s)...`);
@@ -127,7 +126,7 @@ export async function runPass2(
   const assignments = await service.assignSpeakers(
     blocks,
     characterVoiceMap,
-    canonicalNames,
+    characters,
     (current, total) => {
       if (verbose) {
         console.log(`    Block ${current}/${total}`);

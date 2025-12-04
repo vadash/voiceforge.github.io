@@ -236,3 +236,7 @@ Tailwind CSS v3 with custom configuration:
 - **Component classes**: `.btn`, `.input-field`, `.select-field`, `.toggle`, `.card`, `.tabs-list`, `.tab-trigger`
 - **Config**: `tailwind.config.js` with extended theme
 - **PostCSS**: `postcss.config.js` with tailwindcss and autoprefixer
+
+## CRITICAL
+
+USE bash command for Windows!

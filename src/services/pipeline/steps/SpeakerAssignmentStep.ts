@@ -48,14 +48,11 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
 
       this.reportProgress(0, blocks.length, `Processing ${blocks.length} block(s)...`);
 
-      // Get canonical names from characters
-      const canonicalNames = characters.map(c => c.canonicalName);
-
-      // Assign speakers
+      // Assign speakers using full character data (with variations)
       const assignments = await this.llmService.assignSpeakers(
         blocks,
         voiceMap,
-        canonicalNames,
+        characters,
         (current, total) => {
           this.reportProgress(current, total, `Pass 2: Block ${current}/${total}`);
         }

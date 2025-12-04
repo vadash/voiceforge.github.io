@@ -104,7 +104,7 @@ export class LLMVoiceService {
   async assignSpeakers(
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
-    canonicalNames: string[],
+    characters: LLMCharacter[],
     onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> {
     const MAX_CONCURRENT = 20;
@@ -114,8 +114,8 @@ export class LLMVoiceService {
     this.abortController = new AbortController();
     this.pass2Logged = false;
 
-    // Build code mapping from canonical names
-    const { nameToCode, codeToName } = this.buildCodeMappingFromNames(canonicalNames);
+    // Build code mapping from characters (including variations)
+    const { nameToCode, codeToName } = this.buildCodeMapping(characters);
 
     // Process blocks in batches
     for (let i = 0; i < blocks.length; i += MAX_CONCURRENT) {
@@ -125,7 +125,7 @@ export class LLMVoiceService {
 
       const batch = blocks.slice(i, i + MAX_CONCURRENT);
       const batchPromises = batch.map((block) =>
-        this.processPass2Block(block, characterVoiceMap, nameToCode, codeToName)
+        this.processPass2Block(block, characterVoiceMap, characters, nameToCode, codeToName)
       );
 
       const batchResults = await Promise.all(batchPromises);
@@ -148,6 +148,7 @@ export class LLMVoiceService {
   private async processPass2Block(
     block: TextBlock,
     characterVoiceMap: Map<string, string>,
+    characters: LLMCharacter[],
     nameToCode: Map<string, string>,
     codeToName: Map<string, string>
   ): Promise<SpeakerAssignment[]> {
@@ -156,7 +157,7 @@ export class LLMVoiceService {
       .join('\n');
 
     const response = await this.callLLMWithRetry(
-      this.buildPass2Prompt(nameToCode, numberedSentences, block.sentenceStartIndex),
+      this.buildPass2Prompt(characters, nameToCode, numberedSentences, block.sentenceStartIndex),
       (result) => this.validatePass2Response(result, block, codeToName),
       [],
       'pass2'
@@ -265,15 +266,20 @@ ${textBlock}
    * Build Pass 2 prompt (speaker assignment with sparse output)
    */
   private buildPass2Prompt(
+    characters: LLMCharacter[],
     nameToCode: Map<string, string>,
     numberedSentences: string,
     startIndex: number
   ): { system: string; user: string } {
-    // Build codes section - exclude unnamed placeholders from main list
-    const characterCodes = Array.from(nameToCode.entries())
-      .filter(([name]) => !name.includes('UNNAMED'))
-      .map(([name, code]) => `${code}=${name}`)
-      .join(', ');
+    // Build character codes with aliases/variations
+    const characterLines = characters.map((char) => {
+      const code = nameToCode.get(char.canonicalName)!;
+      const aliases = char.variations.filter((v) => v !== char.canonicalName);
+      if (aliases.length > 0) {
+        return `${code}=${char.canonicalName} (also referred to as: ${aliases.join(', ')})`;
+      }
+      return `${code}=${char.canonicalName}`;
+    });
 
     // Get unnamed codes
     const unnamedCodes = Array.from(nameToCode.entries())
@@ -281,46 +287,42 @@ ${textBlock}
       .map(([name, code]) => `${code}=${name}`)
       .join(', ');
 
-    const system = `
-# Role
+    const system = `# Role
 You are a dialogue tagger for audiobook production.
 
 # Objective
 Identify and tag sentences containing dialogue with the correct speaker code, skipping narration.
 
-# Task
-Begin with a concise checklist (3-7 bullets) of what you will do; keep items conceptual, not implementation-level.
-For each sentence found within the "<sentences>" XML tag, output a mapping in the format "index:code" for sentences containing dialogue. Narration-only sentences should be skipped.
-
 # Character Codes
 Use the following character codes:
-${characterCodes}
+${characterLines.join('\n')}
 
-# Unnamed Codes
+# Unnamed Speaker Codes
 Use the following codes for unnamed speakers:
 ${unnamedCodes}
 
 # Tagging Rules
 1. Only tag sentences as dialogue if they contain any of these markers: "text", «text», — text (em-dash)
 2. Do not tag narration-only sentences (those without quotes or em-dash).
-3. If a dialogue sentence is followed by an attribution (e.g., "she said"), use the attribution to identify the speaker.
-4. If the attribution uses a pronoun, use that pronoun as the speaker (do not assign the code to a character mentioned within the dialogue itself).
-5. If the attribution uses a role term (e.g., brother/sister), match the term to the corresponding character code.
-6. Continue tagging with the current speaker code until a new explicit attribution is encountered.
+3. Use attribution to identify speakers:
+   - Direct name: "said John" → use John's code
+   - Role term or alias: "said brother", "brother asked" → find which character is referred to by this alias in the Character Codes list above
+   - Pronouns: "she said", "he replied" → use context (previous speaker or mentioned character)
+4. For dialogue without attribution, continue with the current speaker until a new explicit attribution is encountered.
+5. When a sentence contains dialogue AND narration (mixed), still tag it as dialogue with the speaker's code.
+
+# Critical
+- Match aliases exactly: if a character has "(also referred to as: brother)", then any attribution mentioning "brother" must use that character's code.
+- Track dialogue turns carefully in conversations.
 
 # Output Format
-- Return one line per dialogue sentence in the format: "index:code".
-- Do not include explanations or additional output.
-- If there is no dialogue in the input, return empty output (indicating all lines are narration).
+- Return one line per dialogue sentence in the format: "index:code"
+- Do not include explanations or additional output
+- If there is no dialogue in the input, return empty output (indicating all lines are narration)`;
 
-After tagging, validate that only dialogue sentences are tagged and that all speaker codes match the supplied code lists. If validation fails, self-correct and adjust the output.
-`;
-
-    const user = `
-<sentences>
+    const user = `<sentences>
 ${numberedSentences}
-</sentences>
-`;
+</sentences>`;
 
     return { system, user };
   }

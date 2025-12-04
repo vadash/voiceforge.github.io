@@ -29,7 +29,7 @@ export class MockLLMService implements ILLMService {
   assignSpeakers = vi.fn(async (
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
-    canonicalNames: string[],
+    characters: LLMCharacter[],
     onProgress?: LLMProgressCallback
   ): Promise<SpeakerAssignment[]> => {
     if (this.cancelled) throw new Error('Cancelled');

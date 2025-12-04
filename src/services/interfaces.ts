@@ -189,7 +189,7 @@ export interface ILLMService {
   assignSpeakers(
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
-    canonicalNames: string[],
+    characters: LLMCharacter[],
     onProgress?: LLMProgressCallback
   ): Promise<SpeakerAssignment[]>;
 

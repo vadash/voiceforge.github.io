@@ -10,8 +10,8 @@ describe('SpeakerAssignmentStep', () => {
   let mockTextBlockSplitter: ITextBlockSplitter;
 
   const testCharacters: LLMCharacter[] = [
-    { code: 'N', canonicalName: 'Narrator', gender: 'unknown', aliases: [] },
-    { code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] },
+    { canonicalName: 'Narrator', gender: 'unknown', variations: ['Narrator'] },
+    { canonicalName: 'Alice', gender: 'female', variations: ['Alice'] },
   ];
 
   const testVoiceMap = new Map([
@@ -75,10 +75,10 @@ describe('SpeakerAssignmentStep', () => {
       await step.execute(context, createNeverAbortSignal());
 
       expect(mockLLMService.assignSpeakers).toHaveBeenCalled();
-      const [blocks, voiceMap, canonicalNames] = mockLLMService.assignSpeakers.mock.calls[0];
+      const [blocks, voiceMap, characters] = mockLLMService.assignSpeakers.mock.calls[0];
       expect(blocks).toHaveLength(2);
       expect(voiceMap).toBe(testVoiceMap);
-      expect(canonicalNames).toEqual(['Narrator', 'Alice']);
+      expect(characters).toEqual(testCharacters);
     });
 
     it('preserves existing context properties', async () => {
