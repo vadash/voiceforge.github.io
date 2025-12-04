@@ -1,26 +1,54 @@
 // KeepAwake Service
-// Prevents browser from throttling background tabs by playing inaudible audio
+// Prevents browser from throttling background tabs using multiple strategies:
+// 1. AudioContext with silent oscillator - prevents timer/WebSocket throttling
+// 2. Web Locks API - prevents tab from being discarded
+// 3. Screen Wake Lock - prevents screen dimming (mobile)
 
 export interface IKeepAwake {
-  start(): void;
+  start(): Promise<void>;
   stop(): void;
   isActive(): boolean;
 }
 
 /**
- * KeepAwake uses AudioContext with near-silent oscillator
- * to trick browser into treating tab as "playing audio",
- * which prevents setTimeout/WebSocket throttling in background tabs.
+ * KeepAwake uses multiple strategies to keep the browser active:
+ * - AudioContext: Tricks browser into treating tab as "playing audio"
+ * - Web Locks: Prevents tab from being discarded by browser
+ * - Screen Wake Lock: Prevents screen from dimming (useful on mobile)
  */
 export class KeepAwake implements IKeepAwake {
   private audioContext: AudioContext | null = null;
   private oscillator: OscillatorNode | null = null;
   private gainNode: GainNode | null = null;
+  private wakeLock: WakeLockSentinel | null = null;
+  private lockResolver: (() => void) | null = null;
   private active = false;
 
-  start(): void {
+  async start(): Promise<void> {
     if (this.active) return;
 
+    this.active = true;
+
+    // Strategy 1: AudioContext (prevents timer/WebSocket throttling)
+    this.startAudioContext();
+
+    // Strategy 2: Web Locks API (prevents tab discard)
+    this.startWebLock();
+
+    // Strategy 3: Screen Wake Lock (prevents screen dimming)
+    await this.startScreenWakeLock();
+  }
+
+  stop(): void {
+    if (!this.active) return;
+    this.cleanup();
+  }
+
+  isActive(): boolean {
+    return this.active;
+  }
+
+  private startAudioContext(): void {
     try {
       // Create audio context
       this.audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -40,23 +68,49 @@ export class KeepAwake implements IKeepAwake {
 
       // Start the oscillator
       this.oscillator.start();
-      this.active = true;
     } catch {
       // AudioContext not supported, silently fail
-      this.cleanup();
     }
   }
 
-  stop(): void {
-    if (!this.active) return;
-    this.cleanup();
+  private startWebLock(): void {
+    if (!navigator.locks) return;
+
+    // Request a lock that stays held until we release it
+    navigator.locks.request('tts-conversion-active', { mode: 'exclusive' }, () => {
+      return new Promise<void>((resolve) => {
+        this.lockResolver = resolve;
+      });
+    }).catch(() => {
+      // Lock request failed or was aborted
+    });
   }
 
-  isActive(): boolean {
-    return this.active;
+  private async startScreenWakeLock(): Promise<void> {
+    if (!('wakeLock' in navigator)) return;
+
+    try {
+      this.wakeLock = await navigator.wakeLock.request('screen');
+
+      // Re-acquire wake lock if visibility changes (tab becomes visible again)
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    } catch {
+      // Wake lock not supported or permission denied
+    }
   }
+
+  private handleVisibilityChange = async (): Promise<void> => {
+    if (document.visibilityState === 'visible' && this.active && !this.wakeLock) {
+      try {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+      } catch {
+        // Failed to re-acquire
+      }
+    }
+  };
 
   private cleanup(): void {
+    // Stop AudioContext
     try {
       this.oscillator?.stop();
     } catch {
@@ -75,6 +129,19 @@ export class KeepAwake implements IKeepAwake {
     } catch {
       // Already closed
     }
+
+    // Release Web Lock
+    if (this.lockResolver) {
+      this.lockResolver();
+      this.lockResolver = null;
+    }
+
+    // Release Screen Wake Lock
+    if (this.wakeLock) {
+      this.wakeLock.release().catch(() => {});
+      this.wakeLock = null;
+    }
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
 
     this.oscillator = null;
     this.gainNode = null;

@@ -54,7 +54,7 @@ export function useTTSConversion(): UseTTSConversionResult {
 
     // Start keep-awake to prevent background throttling
     const keepAwake = getKeepAwake();
-    keepAwake.start();
+    await keepAwake.start();
 
     try {
       await orchestratorRef.current.run(text, existingBook);
