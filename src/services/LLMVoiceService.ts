@@ -208,23 +208,55 @@ export class LLMVoiceService {
    * Build Pass 1 prompt (character extraction)
    */
   private buildPass1Prompt(textBlock: string): { system: string; user: string } {
-    const system = `Extract speaking characters from text for audiobook production.
+    const system = `
+# Role
+You are a character extractor designed for audiobook production.
 
-RULES:
-1. Find characters who speak dialogue or have thoughts
-2. Dialogue markers: "text", «text», — text (em-dash)
-3. Keep original names (don't translate)
-4. Use proper names as canonicalName, put roles in variations:
-   - If "брат" speaks and later identified as "Женька" → canonicalName: "Женька", variations: ["Женька", "брат"]
-   - brother/sister/мать/отец → put in variations, not canonicalName
-5. Gender from: pronouns (she/он), verb endings (-ла=female, -л=male), titles (Mrs/мистер)
+# Objective
+Identify and extract all speaking characters from a provided text passage enclosed within "text" XML tags.
 
-OUTPUT JSON only:
-{"characters": [{"canonicalName": "Name", "variations": ["Name", "Nick"], "gender": "male|female|unknown"}]}
+# Extraction Rules
+1. Detect characters who either speak dialogue or express internal thoughts.
+2. Recognize dialogue using any of these markers: "text", «text», — text (em-dash)
+3. Always preserve the original character names exactly as in the source text—never translate or alter them.
+4. Use the proper name as "canonicalName". Classify descriptive terms or alias forms as entries in the "variations" array:
+   - If a character is introduced as a descriptive term but later identified precisely, set the proper name as "canonicalName".
+   - List all encountered forms within the "variations" array, starting with "canonicalName".
+   - Always place descriptive phrases (like brother/sister or unidentified forms) in "variations", not as the "canonicalName" unless no real name is given.
+5. Determine character gender using the following (in order of reliability): pronouns, verb endings, honorifics, or contextual clues from the text.
+6. If gender cannot be determined, set it as ""unknown"".
+7. For ambiguous/unnamed speakers, use the best-available designator from the text as "canonicalName", include all observed variants in "variations", and assign gender as above.
+8. For every character, order the "variations" array with the "canonicalName" first, followed by additional forms in the order encountered in the text.
 
-Empty if no speakers: {"characters": []}`;
+# Output
+Respond in JSON only (no markdown), as:
+{"characters": [{"canonicalName": "Name", "variations": ["Name", "Nickname", ...], "gender": "male|female|unknown"}]}
+If there are no speaking characters, return {"characters": []}.
+After extraction, validate that all detected characters conform to the output schema—if not, self-correct and retry.
 
-    const user = `Text:\n${textBlock}\n\nExtract speakers. JSON only.`;
+## Output Schema
+{
+  "characters": [
+    {
+      "canonicalName": "string (original proper name or, if missing, best available designator)",
+      "variations": ["array of strings (canonicalName as first element, others in order encountered)", ...],
+      "gender": "male" | "female" | "unknown"
+    },
+    ...
+  ]
+}
+
+# Additional Notes
+- If there are no detectable speakers, return {"characters": []}.
+- Use ""unknown"" for gender if context does not clarify it.
+- If all speakers are ambiguous or unnamed, utilize the full textual form as "canonicalName" and compile all other forms in "variations".
+`;
+
+    const user = `
+<text>
+${textBlock}
+</text>
+`;
 
     return { system, user };
   }
@@ -249,25 +281,46 @@ Empty if no speakers: {"characters": []}`;
       .map(([name, code]) => `${code}=${name}`)
       .join(', ');
 
-    const system = `Tag dialogue speakers for audiobook. Output index:code for dialogue sentences only.
+    const system = `
+# Role
+You are a dialogue tagger for audiobook production.
 
-CODES: ${characterCodes}
-UNNAMED: ${unnamedCodes}
+# Objective
+Identify and tag sentences containing dialogue with the correct speaker code, skipping narration.
 
-RULES:
-1. Tag sentences with dialogue: "text", «text», — text (em-dash)
-2. Skip pure narration (no quotes/em-dash)
-3. Attribution after dialogue identifies speaker:
-   - "Hello," she said → "she" is the speaker
-   - — Привет, — сказал Иван → Иван is the speaker
-4. Pronoun in attribution = speaker, not someone mentioned in dialogue
-5. Role terms (брат/brother/sister) refer to a character - use their code
-6. Continue same speaker until new attribution
+# Task
+Begin with a concise checklist (3-7 bullets) of what you will do; keep items conceptual, not implementation-level.
+For each sentence found within the "<sentences>" XML tag, output a mapping in the format "index:code" for sentences containing dialogue. Narration-only sentences should be skipped.
 
-OUTPUT: index:code (one per line, no explanation)
-Empty = all narrator`;
+# Character Codes
+Use the following character codes:
+${characterCodes}
 
-    const user = `Sentences:\n${numberedSentences}\n\nTag speakers.`;
+# Unnamed Codes
+Use the following codes for unnamed speakers:
+${unnamedCodes}
+
+# Tagging Rules
+1. Only tag sentences as dialogue if they contain any of these markers: "text", «text», — text (em-dash)
+2. Do not tag narration-only sentences (those without quotes or em-dash).
+3. If a dialogue sentence is followed by an attribution (e.g., "she said"), use the attribution to identify the speaker.
+4. If the attribution uses a pronoun, use that pronoun as the speaker (do not assign the code to a character mentioned within the dialogue itself).
+5. If the attribution uses a role term (e.g., brother/sister), match the term to the corresponding character code.
+6. Continue tagging with the current speaker code until a new explicit attribution is encountered.
+
+# Output Format
+- Return one line per dialogue sentence in the format: "index:code".
+- Do not include explanations or additional output.
+- If there is no dialogue in the input, return empty output (indicating all lines are narration).
+
+After tagging, validate that only dialogue sentences are tagged and that all speaker codes match the supplied code lists. If validation fails, self-correct and adjust the output.
+`;
+
+    const user = `
+<sentences>
+${numberedSentences}
+</sentences>
+`;
 
     return { system, user };
   }
