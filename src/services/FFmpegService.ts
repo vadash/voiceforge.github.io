@@ -4,7 +4,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import { defaultConfig } from '@/config';
-import type { ILogger } from './interfaces';
+import type { ILogger, IFFmpegService, AudioProcessingOptions } from './interfaces';
 
 export interface AudioProcessingConfig {
   silenceRemoval: boolean;
@@ -23,21 +23,19 @@ const CDN_MIRRORS: CDNConfig[] = defaultConfig.ffmpeg.cdnMirrors.map((url, index
   wasmJs: 'ffmpeg-core.wasm',
 }));
 
-class FFmpegService {
-  private static instance: FFmpegService | null = null;
+/**
+ * FFmpegService - Implements IFFmpegService interface
+ * Container-managed singleton (no static getInstance)
+ */
+export class FFmpegService implements IFFmpegService {
   private ffmpeg: FFmpeg | null = null;
   private loadPromise: Promise<boolean> | null = null;
   private loaded = false;
   private loadError: string | null = null;
   private logger?: ILogger;
 
-  private constructor() {}
-
-  static getInstance(): FFmpegService {
-    if (!FFmpegService.instance) {
-      FFmpegService.instance = new FFmpegService();
-    }
-    return FFmpegService.instance;
+  constructor(logger?: ILogger) {
+    this.logger = logger;
   }
 
   setLogger(logger: ILogger): void {
@@ -251,5 +249,6 @@ class FFmpegService {
   }
 }
 
-export const ffmpegService = FFmpegService.getInstance();
+// Note: No longer exporting a singleton instance
+// Use DI container to get the singleton: container.get(ServiceTypes.FFmpegService)
 export default FFmpegService;

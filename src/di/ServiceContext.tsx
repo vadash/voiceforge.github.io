@@ -10,7 +10,7 @@ import { defaultConfig, type AppConfig } from '@/config';
 // Note: EdgeTTSService, TTSWorkerPool, AudioMerger, LLMVoiceService,
 // VoiceAssigner, and FileConverter are created per-conversion by the orchestrator,
 // not pre-registered in the container.
-import { ffmpegService } from '@/services/FFmpegService';
+import { FFmpegService } from '@/services/FFmpegService';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
 import { LoggerService } from '@/services/LoggerService';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
@@ -19,6 +19,7 @@ import { LLMVoiceService } from '@/services/LLMVoiceService';
 import { TTSWorkerPool } from '@/services/TTSWorkerPool';
 import { AudioMerger } from '@/services/AudioMerger';
 import { VoiceAssigner } from '@/services/VoiceAssigner';
+import { EdgeTTSService } from '@/services/EdgeTTSService';
 import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
 import type { LogStore } from '@/stores/LogStore';
 
@@ -31,9 +32,13 @@ import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
   IAudioMergerFactory,
+  IEdgeTTSServiceFactory,
+  IVoiceAssignerFactory,
   LLMServiceFactoryOptions,
   WorkerPoolOptions,
   MergerConfig,
+  TTSWorkerOptions,
+  VoiceAssignerOptions,
 } from '@/services/interfaces';
 import type { IPipelineRunner } from '@/services/pipeline/types';
 
@@ -157,38 +162,7 @@ class SecureStorageAdapter implements ISecureStorage {
   }
 }
 
-// ============================================================================
-// FFmpeg Service Adapter
-// ============================================================================
-
-/**
- * Adapter wrapping the singleton FFmpegService
- */
-class FFmpegServiceAdapter implements IFFmpegService {
-  load(onProgress?: (message: string) => void): Promise<boolean> {
-    return ffmpegService.load(onProgress);
-  }
-
-  isAvailable(): boolean {
-    return ffmpegService.isAvailable();
-  }
-
-  getLoadError(): string | null {
-    return ffmpegService.getLoadError();
-  }
-
-  processAudio(
-    chunks: Uint8Array[],
-    config: { silenceRemoval: boolean; normalization: boolean },
-    onProgress?: (message: string) => void
-  ): Promise<Uint8Array> {
-    return ffmpegService.processAudio(chunks, config, onProgress);
-  }
-
-  terminate(): void {
-    ffmpegService.terminate();
-  }
-}
+// Note: FFmpegServiceAdapter removed - FFmpegService now implements IFFmpegService directly
 
 // ============================================================================
 // Container Factories
@@ -219,8 +193,11 @@ export function createProductionContainer(
     return new SecureStorageAdapter(logger);
   });
 
-  // Register FFmpeg service (singleton - wraps existing singleton)
-  container.registerSingleton(ServiceTypes.FFmpegService, () => new FFmpegServiceAdapter());
+  // Register FFmpeg service (singleton)
+  container.registerSingleton<IFFmpegService>(ServiceTypes.FFmpegService, () => {
+    const logger = container.get<ILogger>(ServiceTypes.Logger);
+    return new FFmpegService(logger);
+  });
 
   // Register TextBlockSplitter (singleton)
   container.registerSingleton<ITextBlockSplitter>(
@@ -248,18 +225,47 @@ export function createProductionContainer(
     })
   );
 
-  container.registerSingleton<IWorkerPoolFactory>(
-    ServiceTypes.WorkerPoolFactory,
+  // Register EdgeTTS service factory
+  container.registerSingleton<IEdgeTTSServiceFactory>(
+    ServiceTypes.EdgeTTSServiceFactory,
     () => ({
-      create: (options: WorkerPoolOptions) => new TTSWorkerPool(options),
+      create: (options: TTSWorkerOptions) => new EdgeTTSService(options),
     })
   );
 
+  // Register worker pool factory (injects EdgeTTS factory)
+  container.registerSingleton<IWorkerPoolFactory>(
+    ServiceTypes.WorkerPoolFactory,
+    () => {
+      const edgeTTSFactory = container.get<IEdgeTTSServiceFactory>(ServiceTypes.EdgeTTSServiceFactory);
+      return {
+        create: (options: WorkerPoolOptions) => new TTSWorkerPool(edgeTTSFactory, options),
+      };
+    }
+  );
+
+  // Register audio merger factory (injects FFmpegService)
   container.registerSingleton<IAudioMergerFactory>(
     ServiceTypes.AudioMergerFactory,
-    () => ({
-      create: (cfg: MergerConfig) => new AudioMerger(cfg),
-    })
+    () => {
+      const ffmpeg = container.get<IFFmpegService>(ServiceTypes.FFmpegService);
+      return {
+        create: (cfg: MergerConfig) => new AudioMerger(ffmpeg, cfg),
+      };
+    }
+  );
+
+  // Register VoiceAssigner factory
+  container.registerSingleton<IVoiceAssignerFactory>(
+    ServiceTypes.VoiceAssignerFactory,
+    () => {
+      const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
+      return {
+        create: (options: VoiceAssignerOptions) => new VoiceAssigner(voicePoolBuilder, options),
+        createWithFilteredPool: (narratorVoice: string, language: string) =>
+          VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language),
+      };
+    }
   );
 
   return container;
@@ -273,7 +279,9 @@ export interface ServiceOverrides {
   logger?: ILogger;
   secureStorage?: ISecureStorage;
   ffmpegService?: IFFmpegService;
-  // Add more as needed
+  edgeTTSServiceFactory?: IEdgeTTSServiceFactory;
+  voiceAssignerFactory?: IVoiceAssignerFactory;
+  voicePoolBuilder?: IVoicePoolBuilder;
 }
 
 /**
@@ -309,7 +317,49 @@ export function createTestContainer(overrides: ServiceOverrides = {}): ServiceCo
   if (overrides.ffmpegService) {
     container.registerInstance(ServiceTypes.FFmpegService, overrides.ffmpegService);
   } else {
-    container.registerSingleton(ServiceTypes.FFmpegService, () => new FFmpegServiceAdapter());
+    container.registerSingleton<IFFmpegService>(ServiceTypes.FFmpegService, () => {
+      const logger = container.get<ILogger>(ServiceTypes.Logger);
+      return new FFmpegService(logger);
+    });
+  }
+
+  // Register VoicePoolBuilder
+  if (overrides.voicePoolBuilder) {
+    container.registerInstance(ServiceTypes.VoicePoolBuilder, overrides.voicePoolBuilder);
+  } else {
+    container.registerSingleton<IVoicePoolBuilder>(
+      ServiceTypes.VoicePoolBuilder,
+      () => new VoicePoolBuilder()
+    );
+  }
+
+  // Register EdgeTTS factory
+  if (overrides.edgeTTSServiceFactory) {
+    container.registerInstance(ServiceTypes.EdgeTTSServiceFactory, overrides.edgeTTSServiceFactory);
+  } else {
+    container.registerSingleton<IEdgeTTSServiceFactory>(
+      ServiceTypes.EdgeTTSServiceFactory,
+      () => ({
+        create: (options: TTSWorkerOptions) => new EdgeTTSService(options),
+      })
+    );
+  }
+
+  // Register VoiceAssigner factory
+  if (overrides.voiceAssignerFactory) {
+    container.registerInstance(ServiceTypes.VoiceAssignerFactory, overrides.voiceAssignerFactory);
+  } else {
+    container.registerSingleton<IVoiceAssignerFactory>(
+      ServiceTypes.VoiceAssignerFactory,
+      () => {
+        const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
+        return {
+          create: (options: VoiceAssignerOptions) => new VoiceAssigner(voicePoolBuilder, options),
+          createWithFilteredPool: (narratorVoice: string, language: string) =>
+            VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language),
+        };
+      }
+    );
   }
 
   return container;

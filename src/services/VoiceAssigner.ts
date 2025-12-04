@@ -2,9 +2,9 @@
  * VoiceAssigner - Assigns unique voices to characters based on gender
  */
 
-import { buildVoicePool, buildFilteredPool } from './VoicePoolBuilder';
 import type { VoicePool, CharacterInfo, LLMCharacter } from '../state/types';
 import type { DetectedLanguage } from '../utils/languageDetection';
+import type { IVoiceAssigner, IVoicePoolBuilder, VoiceAssignerOptions as IVoiceAssignerOptions } from './interfaces';
 
 export interface VoiceAssignment {
   character: string;
@@ -18,15 +18,21 @@ export interface VoiceAssignerOptions {
   voicePool?: VoicePool;
 }
 
-export class VoiceAssigner {
+/**
+ * VoiceAssigner - Implements IVoiceAssigner interface
+ * Receives IVoicePoolBuilder via constructor for testability
+ */
+export class VoiceAssigner implements IVoiceAssigner {
+  private voicePoolBuilder: IVoicePoolBuilder;
   private assignments: Map<string, VoiceAssignment> = new Map();
   private usedVoices: Set<string> = new Set();
   private options: VoiceAssignerOptions;
   private voicePool: VoicePool;
 
-  constructor(options: VoiceAssignerOptions) {
+  constructor(voicePoolBuilder: IVoicePoolBuilder, options: VoiceAssignerOptions) {
+    this.voicePoolBuilder = voicePoolBuilder;
     this.options = options;
-    this.voicePool = options.voicePool ?? buildVoicePool(options.locale);
+    this.voicePool = options.voicePool ?? this.voicePoolBuilder.buildPool(options.locale ?? 'en');
 
     // Reserve narrator voice
     this.usedVoices.add(options.narratorVoice);
@@ -150,10 +156,14 @@ export class VoiceAssigner {
   /**
    * Create a VoiceAssigner with filtered pool (detected language + multilingual)
    */
-  static createWithFilteredPool(narratorVoice: string, language: DetectedLanguage = 'en'): VoiceAssigner {
-    return new VoiceAssigner({
+  static createWithFilteredPool(
+    voicePoolBuilder: IVoicePoolBuilder,
+    narratorVoice: string,
+    language: string = 'en'
+  ): VoiceAssigner {
+    return new VoiceAssigner(voicePoolBuilder, {
       narratorVoice,
-      voicePool: buildFilteredPool(language),
+      voicePool: voicePoolBuilder.buildPool(language),
     });
   }
 

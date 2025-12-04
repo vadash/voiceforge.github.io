@@ -420,3 +420,39 @@ export interface IAudioMergerFactory {
   /** Create a new audio merger */
   create(config: MergerConfig): IAudioMerger;
 }
+
+// ============================================================================
+// EdgeTTS Service Interfaces
+// ============================================================================
+
+/**
+ * Factory for creating EdgeTTS service instances
+ * Used by TTSWorkerPool to create TTS workers
+ */
+export interface IEdgeTTSServiceFactory {
+  /** Create a new EdgeTTS service instance */
+  create(options: TTSWorkerOptions): ITTSService;
+}
+
+// ============================================================================
+// VoiceAssigner Factory Interface
+// ============================================================================
+
+/**
+ * Options for creating a VoiceAssigner
+ */
+export interface VoiceAssignerOptions {
+  narratorVoice: string;
+  locale?: string;
+  voicePool?: VoicePool;
+}
+
+/**
+ * Factory for creating VoiceAssigner instances
+ */
+export interface IVoiceAssignerFactory {
+  /** Create a new VoiceAssigner instance */
+  create(options: VoiceAssignerOptions): IVoiceAssigner;
+  /** Create with filtered pool (detected language + multilingual) */
+  createWithFilteredPool(narratorVoice: string, language: string): IVoiceAssigner;
+}

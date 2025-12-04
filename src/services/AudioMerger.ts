@@ -1,9 +1,9 @@
 // AudioMerger - Handles audio merging with duration-based grouping and FFmpeg processing
 // Supports Opus encoding with silence removal and normalization
 
-import { ffmpegService, type AudioProcessingConfig } from './FFmpegService';
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/fileUtils';
+import type { IFFmpegService, IAudioMerger, MergeProgressCallback } from './interfaces';
 
 export interface MergedFile {
   filename: string;
@@ -26,13 +26,19 @@ export interface MergerConfig {
   normalization: boolean;
 }
 
-export class AudioMerger {
+/**
+ * AudioMerger - Implements IAudioMerger interface
+ * Receives IFFmpegService via constructor for testability
+ */
+export class AudioMerger implements IAudioMerger {
+  private ffmpegService: IFFmpegService;
   private config: MergerConfig;
   private targetDurationMs: number;
   private minDurationMs: number;
   private maxDurationMs: number;
 
-  constructor(config: MergerConfig) {
+  constructor(ffmpegService: IFFmpegService, config: MergerConfig) {
+    this.ffmpegService = ffmpegService;
     this.config = config;
 
     // Duration settings from config
@@ -193,9 +199,9 @@ export class AudioMerger {
     if (chunks.length === 0) return null;
 
     // Use FFmpeg for Opus encoding
-    if (this.config.outputFormat === 'opus' && ffmpegService.isAvailable()) {
+    if (this.config.outputFormat === 'opus' && this.ffmpegService.isAvailable()) {
       try {
-        const processedAudio = await ffmpegService.processAudio(
+        const processedAudio = await this.ffmpegService.processAudio(
           chunks,
           {
             silenceRemoval: this.config.silenceRemoval,

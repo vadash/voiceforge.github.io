@@ -9,6 +9,20 @@ import { MockFFmpegService, createMockFFmpegService } from './mocks/MockFFmpegSe
 import { MockLogger, createMockLogger } from './mocks/MockLogger';
 import { MockSecureStorage, createMockSecureStorage } from './mocks/MockSecureStorage';
 import { defaultConfig } from '@/config';
+import { TextBlockSplitter } from '@/services/TextBlockSplitter';
+import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
+import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
+import type {
+  ILLMServiceFactory,
+  IWorkerPoolFactory,
+  IAudioMergerFactory,
+  IEdgeTTSServiceFactory,
+  IVoiceAssignerFactory,
+  ITextBlockSplitter,
+  IVoicePoolBuilder,
+  TTSWorkerOptions,
+} from '@/services/interfaces';
+import type { IPipelineRunner } from '@/services/pipeline/types';
 
 export interface MockServices {
   tts: MockTTSService;
@@ -46,14 +60,84 @@ export function createTestContainer(options: TestContainerOptions = {}): {
     secureStorage: options.secureStorage || createMockSecureStorage(),
   };
 
-  // Register mock services using the actual ServiceContainer API
+  // Core services
+  container.registerInstance(ServiceTypes.Config, defaultConfig);
+  container.registerInstance(ServiceTypes.Logger, mocks.logger);
+  container.registerInstance(ServiceTypes.SecureStorage, mocks.secureStorage);
+  container.registerInstance(ServiceTypes.FFmpegService, mocks.ffmpeg);
+
+  // Utility services
+  container.registerSingleton<ITextBlockSplitter>(
+    ServiceTypes.TextBlockSplitter,
+    () => new TextBlockSplitter()
+  );
+  container.registerSingleton<IVoicePoolBuilder>(
+    ServiceTypes.VoicePoolBuilder,
+    () => new VoicePoolBuilder()
+  );
+
+  // Pipeline runner
+  container.registerTransient<IPipelineRunner>(
+    ServiceTypes.PipelineRunner,
+    () => new PipelineRunner(mocks.logger)
+  );
+
+  // Factories - return mock services
+  container.registerSingleton<ILLMServiceFactory>(
+    ServiceTypes.LLMServiceFactory,
+    () => ({
+      create: () => mocks.llm,
+    })
+  );
+
+  container.registerSingleton<IEdgeTTSServiceFactory>(
+    ServiceTypes.EdgeTTSServiceFactory,
+    () => ({
+      create: (options: TTSWorkerOptions) => mocks.tts,
+    })
+  );
+
+  container.registerSingleton<IWorkerPoolFactory>(
+    ServiceTypes.WorkerPoolFactory,
+    () => ({
+      create: () => mocks.workerPool,
+    })
+  );
+
+  container.registerSingleton<IAudioMergerFactory>(
+    ServiceTypes.AudioMergerFactory,
+    () => ({
+      create: () => ({
+        calculateMergeGroups: () => [],
+        merge: async () => [],
+        saveMergedFiles: async () => {},
+      }),
+    })
+  );
+
+  container.registerSingleton<IVoiceAssignerFactory>(
+    ServiceTypes.VoiceAssignerFactory,
+    () => {
+      const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
+      return {
+        create: (opts) => ({
+          assignVoicesFromLLMCharacters: () => new Map(),
+          getNarratorVoice: () => opts.narratorVoice,
+          reset: () => {},
+        }),
+        createWithFilteredPool: (narratorVoice) => ({
+          assignVoicesFromLLMCharacters: () => new Map(),
+          getNarratorVoice: () => narratorVoice,
+          reset: () => {},
+        }),
+      };
+    }
+  );
+
+  // Legacy registrations for backward compatibility
   container.registerTransient(ServiceTypes.TTSService, () => mocks.tts);
   container.registerTransient(ServiceTypes.WorkerPool, () => mocks.workerPool);
   container.registerInstance(ServiceTypes.LLMService, mocks.llm);
-  container.registerInstance(ServiceTypes.FFmpegService, mocks.ffmpeg);
-  container.registerInstance(ServiceTypes.Logger, mocks.logger);
-  container.registerInstance(ServiceTypes.SecureStorage, mocks.secureStorage);
-  container.registerInstance(ServiceTypes.Config, defaultConfig);
 
   return { container, mocks };
 }

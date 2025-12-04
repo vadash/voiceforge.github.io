@@ -1,9 +1,9 @@
 // TTSWorkerPool - Queue-based worker pool for concurrent TTS processing
 // Replaces legacy polling approach with Promise-based queue
 
-import { EdgeTTSService, TTSWorkerOptions } from './EdgeTTSService';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
 import { defaultConfig, getTTSRetryDelay, getWorkerStartDelay, type TTSConfig } from '@/config';
+import type { IEdgeTTSServiceFactory, ITTSService, IWorkerPool, TTSWorkerOptions } from './interfaces';
 
 export interface PoolTask {
   partIndex: number;
@@ -24,12 +24,17 @@ export interface WorkerPoolOptions {
 }
 
 interface ActiveWorker {
-  service: EdgeTTSService;
+  service: ITTSService;
   task: PoolTask;
   retryCount: number;
 }
 
-export class TTSWorkerPool {
+/**
+ * TTSWorkerPool - Implements IWorkerPool interface
+ * Receives IEdgeTTSServiceFactory via constructor for testability
+ */
+export class TTSWorkerPool implements IWorkerPool {
+  private edgeTTSFactory: IEdgeTTSServiceFactory;
   private queue: PoolTask[] = [];
   private activeWorkers: Map<number, ActiveWorker> = new Map();
   private completedAudio: Map<number, Uint8Array> = new Map();
@@ -47,7 +52,8 @@ export class TTSWorkerPool {
   private onTaskError?: (partIndex: number, error: Error) => void;
   private onAllComplete?: () => void;
 
-  constructor(options: WorkerPoolOptions) {
+  constructor(edgeTTSFactory: IEdgeTTSServiceFactory, options: WorkerPoolOptions) {
+    this.edgeTTSFactory = edgeTTSFactory;
     this.maxWorkers = options.maxWorkers;
     this.voiceConfig = options.config;
     this.ttsConfig = options.ttsConfig ?? defaultConfig.tts;
@@ -121,7 +127,7 @@ export class TTSWorkerPool {
       },
     };
 
-    const service = new EdgeTTSService(workerOptions);
+    const service = this.edgeTTSFactory.create(workerOptions);
     this.activeWorkers.set(task.partIndex, { service, task, retryCount });
     service.start();
   }

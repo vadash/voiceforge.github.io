@@ -11,10 +11,11 @@ import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
   IAudioMergerFactory,
+  IVoiceAssignerFactory,
+  IVoicePoolBuilder,
 } from '@/services/interfaces';
 import type { IPipelineRunner, PipelineContext, PipelineProgress } from '@/services/pipeline/types';
 import type { ProcessedBook, TTSConfig as VoiceConfig } from '@/state/types';
-import { VoiceAssigner } from './VoiceAssigner';
 import {
   CharacterExtractionStep,
   VoiceAssignmentStep,
@@ -38,6 +39,7 @@ export class ConversionOrchestrator {
   private llmServiceFactory: ILLMServiceFactory;
   private workerPoolFactory: IWorkerPoolFactory;
   private audioMergerFactory: IAudioMergerFactory;
+  private voiceAssignerFactory: IVoiceAssignerFactory;
 
   constructor(
     private container: ServiceContainer,
@@ -49,6 +51,7 @@ export class ConversionOrchestrator {
     this.llmServiceFactory = container.get<ILLMServiceFactory>(ServiceTypes.LLMServiceFactory);
     this.workerPoolFactory = container.get<IWorkerPoolFactory>(ServiceTypes.WorkerPoolFactory);
     this.audioMergerFactory = container.get<IAudioMergerFactory>(ServiceTypes.AudioMergerFactory);
+    this.voiceAssignerFactory = container.get<IVoiceAssignerFactory>(ServiceTypes.VoiceAssignerFactory);
   }
 
   /**
@@ -157,7 +160,7 @@ export class ConversionOrchestrator {
       narratorVoice: settings.narratorVoice.value,
       detectedLanguage: detectedLang,
       createVoiceAssigner: (narratorVoice, locale) =>
-        VoiceAssigner.createWithFilteredPool(narratorVoice, locale as any),
+        this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale),
     }));
 
     // Step 3: Speaker Assignment (LLM Pass 2)

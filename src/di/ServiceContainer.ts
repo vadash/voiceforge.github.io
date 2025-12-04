@@ -25,6 +25,8 @@ export const ServiceTypes = {
   LLMServiceFactory: Symbol.for('ILLMServiceFactory'),
   WorkerPoolFactory: Symbol.for('IWorkerPoolFactory'),
   AudioMergerFactory: Symbol.for('IAudioMergerFactory'),
+  EdgeTTSServiceFactory: Symbol.for('IEdgeTTSServiceFactory'),
+  VoiceAssignerFactory: Symbol.for('IVoiceAssignerFactory'),
 
   // Configuration
   Config: Symbol.for('AppConfig'),

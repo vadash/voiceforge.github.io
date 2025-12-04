@@ -4,6 +4,100 @@
 import type { LLMCharacter, SpeakerAssignment, TextBlock } from '@/state/types';
 import type { MergedFile } from '@/services/interfaces';
 
+// ============================================================================
+// Base Context Types
+// ============================================================================
+
+/**
+ * Base pipeline context with required input fields
+ */
+export interface BaseContext {
+  text: string;
+  fileNames: Array<[string, number]>;
+  dictionaryRules: string[];
+  detectedLanguage: string;
+  directoryHandle?: FileSystemDirectoryHandle | null;
+}
+
+/**
+ * Context with characters extracted (after CharacterExtractionStep)
+ */
+export interface ContextWithCharacters extends BaseContext {
+  characters: LLMCharacter[];
+}
+
+/**
+ * Context with voice map (after VoiceAssignmentStep)
+ */
+export interface ContextWithVoiceMap extends ContextWithCharacters {
+  voiceMap: Map<string, string>;
+}
+
+/**
+ * Context with assignments (after SpeakerAssignmentStep)
+ */
+export interface ContextWithAssignments extends ContextWithVoiceMap {
+  assignments: SpeakerAssignment[];
+}
+
+/**
+ * Context with audio (after TTSConversionStep)
+ */
+export interface ContextWithAudio extends ContextWithAssignments {
+  audioMap: Map<number, Uint8Array>;
+  failedTasks: Set<number>;
+}
+
+/**
+ * Context with merged files (after AudioMergeStep)
+ */
+export interface ContextWithMergedFiles extends ContextWithAudio {
+  mergedFiles: MergedFile[];
+}
+
+// ============================================================================
+// Type Guards
+// ============================================================================
+
+/**
+ * Check if context has characters
+ */
+export function hasCharacters(ctx: PipelineContext): ctx is PipelineContext & { characters: LLMCharacter[] } {
+  return Array.isArray(ctx.characters);
+}
+
+/**
+ * Check if context has voice map
+ */
+export function hasVoiceMap(ctx: PipelineContext): ctx is PipelineContext & { characters: LLMCharacter[]; voiceMap: Map<string, string> } {
+  return Array.isArray(ctx.characters) && ctx.voiceMap instanceof Map;
+}
+
+/**
+ * Check if context has assignments
+ */
+export function hasAssignments(ctx: PipelineContext): ctx is PipelineContext & { assignments: SpeakerAssignment[] } {
+  return Array.isArray(ctx.assignments);
+}
+
+/**
+ * Check if context has audio
+ */
+export function hasAudio(ctx: PipelineContext): ctx is PipelineContext & { audioMap: Map<number, Uint8Array> } {
+  return ctx.audioMap instanceof Map;
+}
+
+/**
+ * Check if context has merged files
+ */
+export function hasMergedFiles(ctx: PipelineContext): ctx is PipelineContext & { mergedFiles: MergedFile[] } {
+  return Array.isArray(ctx.mergedFiles);
+}
+
+// ============================================================================
+// Full Pipeline Context (union of all stages)
+// ============================================================================
+
 /**
  * Pipeline context - data that flows through pipeline steps
  * Each step can read and modify this context
