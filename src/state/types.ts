@@ -148,6 +148,18 @@ export interface Pass2Response {
   sentences: Array<{ index: number; speaker: string }>;
 }
 
+export interface CharacterMergeEntry {
+  keep: string;
+  absorb: string[];
+  variations: string[];
+  gender: 'male' | 'female' | 'unknown';
+}
+
+export interface MergeResponse {
+  merges: CharacterMergeEntry[];
+  unchanged: string[];
+}
+
 export interface SpeakerAssignment {
   sentenceIndex: number;
   text: string;

@@ -5,6 +5,7 @@ import type {
   Pass2Response,
   SpeakerAssignment,
   LLMValidationResult,
+  MergeResponse,
 } from '@/state/types';
 import type { ILogger } from './interfaces';
 
@@ -27,8 +28,9 @@ export interface ProgressCallback {
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private abortController: AbortController | null = null;
-  private pass1Logged = false;
-  private pass2Logged = false;
+  private extractLogged = false;
+  private mergeLogged = false;
+  private assignLogged = false;
   private logger?: ILogger;
 
   constructor(options: LLMVoiceServiceOptions) {
@@ -71,7 +73,7 @@ export class LLMVoiceService {
   ): Promise<LLMCharacter[]> {
     const allCharacters: LLMCharacter[] = [];
     this.abortController = new AbortController();
-    this.pass1Logged = false;
+    this.extractLogged = false;
 
     for (let i = 0; i < blocks.length; i++) {
       if (this.abortController.signal.aborted) {
@@ -84,18 +86,25 @@ export class LLMVoiceService {
       const blockText = block.sentences.join('\n');
 
       const response = await this.callLLMWithRetry(
-        this.buildPass1Prompt(blockText),
-        (result) => this.validatePass1Response(result),
+        this.buildExtractPrompt(blockText),
+        (result) => this.validateExtractResponse(result),
         [],
-        'pass1'
+        'extract'
       );
 
       const parsed = JSON.parse(response) as Pass1Response;
       allCharacters.push(...parsed.characters);
     }
 
-    // Merge characters from all blocks
-    return this.mergeCharacters(allCharacters);
+    // Simple merge by canonicalName first
+    let merged = this.mergeCharacters(allCharacters);
+
+    // LLM merge only if multiple blocks were processed and multiple characters exist
+    if (blocks.length > 1 && merged.length > 1) {
+      merged = await this.mergeCharactersWithLLM(merged);
+    }
+
+    return merged;
   }
 
   /**
@@ -112,7 +121,7 @@ export class LLMVoiceService {
     let completed = 0;
 
     this.abortController = new AbortController();
-    this.pass2Logged = false;
+    this.assignLogged = false;
 
     // Build code mapping from characters (including variations)
     const { nameToCode, codeToName } = this.buildCodeMapping(characters);
@@ -125,7 +134,7 @@ export class LLMVoiceService {
 
       const batch = blocks.slice(i, i + MAX_CONCURRENT);
       const batchPromises = batch.map((block) =>
-        this.processPass2Block(block, characterVoiceMap, characters, nameToCode, codeToName)
+        this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName)
       );
 
       const batchResults = await Promise.all(batchPromises);
@@ -145,7 +154,7 @@ export class LLMVoiceService {
   /**
    * Process a single block for Pass 2
    */
-  private async processPass2Block(
+  private async processAssignBlock(
     block: TextBlock,
     characterVoiceMap: Map<string, string>,
     characters: LLMCharacter[],
@@ -157,14 +166,14 @@ export class LLMVoiceService {
       .join('\n');
 
     const response = await this.callLLMWithRetry(
-      this.buildPass2Prompt(characters, nameToCode, numberedSentences, block.sentenceStartIndex),
-      (result) => this.validatePass2Response(result, block, codeToName),
+      this.buildAssignPrompt(characters, nameToCode, numberedSentences, block.sentenceStartIndex),
+      (result) => this.validateAssignResponse(result, block, codeToName),
       [],
-      'pass2'
+      'assign'
     );
 
     // Parse sparse response and build speaker assignments
-    const speakerMap = this.parsePass2Response(response, codeToName);
+    const speakerMap = this.parseAssignResponse(response, codeToName);
 
     return block.sentences.map((text, i) => {
       const index = block.sentenceStartIndex + i;
@@ -182,9 +191,9 @@ export class LLMVoiceService {
   }
 
   /**
-   * Parse sparse Pass 2 response (index:code format)
+   * Parse sparse Assign response (index:code format)
    */
-  private parsePass2Response(
+  private parseAssignResponse(
     response: string,
     codeToName: Map<string, string>
   ): Map<number, string> {
@@ -206,9 +215,9 @@ export class LLMVoiceService {
   }
 
   /**
-   * Build Pass 1 prompt (character extraction)
+   * Build Extract prompt (character extraction)
    */
-  private buildPass1Prompt(textBlock: string): { system: string; user: string } {
+  private buildExtractPrompt(textBlock: string): { system: string; user: string } {
     const system = `# Character Extractor for Audiobook Production
 
 <task>
@@ -299,9 +308,9 @@ ${textBlock}
   }
 
   /**
-   * Build Pass 2 prompt (speaker assignment with sparse output)
+   * Build Assign prompt (speaker assignment with sparse output)
    */
-  private buildPass2Prompt(
+  private buildAssignPrompt(
     characters: LLMCharacter[],
     nameToCode: Map<string, string>,
     numberedSentences: string,
@@ -458,7 +467,7 @@ ${numberedSentences}
     prompt: { system: string; user: string },
     validate: (response: string) => LLMValidationResult,
     previousErrors: string[] = [],
-    pass: 'pass1' | 'pass2' = 'pass1'
+    pass: 'extract' | 'merge' | 'assign' = 'extract'
   ): Promise<string> {
     const delays = [1000, 3000, 5000, 10000, 30000, 60000, 120000, 300000, 600000];
     let attempt = 0;
@@ -498,7 +507,7 @@ ${numberedSentences}
   private async callLLM(
     prompt: { system: string; user: string },
     previousErrors: string[] = [],
-    pass: 'pass1' | 'pass2' = 'pass1'
+    pass: 'extract' | 'merge' | 'assign' = 'extract'
   ): Promise<string> {
     const messages: Array<{ role: string; content: string }> = [
       { role: 'system', content: prompt.system },
@@ -520,11 +529,13 @@ ${numberedSentences}
       temperature: 0.1,
     };
 
-    // Save request log (first call only)
-    if (pass === 'pass1' && !this.pass1Logged) {
-      this.saveLog('pass1_request.json', requestBody);
-    } else if (pass === 'pass2' && !this.pass2Logged) {
-      this.saveLog('pass2_request.json', requestBody);
+    // Save request log (first call only per pass type)
+    if (pass === 'extract' && !this.extractLogged) {
+      this.saveLog('extract_request.json', requestBody);
+    } else if (pass === 'merge' && !this.mergeLogged) {
+      this.saveLog('merge_request.json', requestBody);
+    } else if (pass === 'assign' && !this.assignLogged) {
+      this.saveLog('assign_request.json', requestBody);
     }
 
     const response = await fetch(`${this.options.apiUrl}/chat/completions`, {
@@ -544,13 +555,16 @@ ${numberedSentences}
 
     const data = await response.json();
 
-    // Save response log (first call only)
-    if (pass === 'pass1' && !this.pass1Logged) {
-      this.saveLog('pass1_response.json', data);
-      this.pass1Logged = true;
-    } else if (pass === 'pass2' && !this.pass2Logged) {
-      this.saveLog('pass2_response.json', data);
-      this.pass2Logged = true;
+    // Save response log (first call only per pass type)
+    if (pass === 'extract' && !this.extractLogged) {
+      this.saveLog('extract_response.json', data);
+      this.extractLogged = true;
+    } else if (pass === 'merge' && !this.mergeLogged) {
+      this.saveLog('merge_response.json', data);
+      this.mergeLogged = true;
+    } else if (pass === 'assign' && !this.assignLogged) {
+      this.saveLog('assign_response.json', data);
+      this.assignLogged = true;
     }
 
     const content = data.choices?.[0]?.message?.content;
@@ -587,9 +601,9 @@ ${numberedSentences}
   }
 
   /**
-   * Validate Pass 1 response
+   * Validate Extract response
    */
-  private validatePass1Response(response: string): LLMValidationResult {
+  private validateExtractResponse(response: string): LLMValidationResult {
     const errors: string[] = [];
 
     try {
@@ -623,9 +637,9 @@ ${numberedSentences}
   }
 
   /**
-   * Validate Pass 2 response (sparse format: index:code lines)
+   * Validate Assign response (sparse format: index:code lines)
    */
-  private validatePass2Response(
+  private validateAssignResponse(
     response: string,
     block: TextBlock,
     codeToName: Map<string, string>
@@ -733,6 +747,194 @@ ${numberedSentences}
     }
 
     return Array.from(merged.values());
+  }
+
+  /**
+   * LLM-based character merge to deduplicate characters with different canonical names
+   */
+  private async mergeCharactersWithLLM(characters: LLMCharacter[]): Promise<LLMCharacter[]> {
+    this.mergeLogged = false;
+
+    const response = await this.callLLMWithRetry(
+      this.buildMergePrompt(characters),
+      (result) => this.validateMergeResponse(result, characters),
+      [],
+      'merge'
+    );
+
+    const parsed = JSON.parse(response) as MergeResponse;
+    return this.applyMergeResponse(characters, parsed);
+  }
+
+  /**
+   * Build Merge prompt (character deduplication)
+   */
+  private buildMergePrompt(characters: LLMCharacter[]): { system: string; user: string } {
+    const system = `# Character Deduplication for Audiobook Production
+
+<task>
+Identify characters that are the SAME PERSON but were extracted with different canonical names.
+Merge duplicates into single entries.
+</task>
+
+## When to Merge
+
+<merge_triggers>
+Characters are the SAME PERSON if:
+- They share a variation (e.g., both have "Captain" in variations)
+- One's canonicalName appears in another's variations
+- First name + surname relationship (e.g., "John" and "Smith" for John Smith)
+- Title + name relationship (e.g., "Captain" and "Tennyson" for Captain Tennyson)
+</merge_triggers>
+
+<warning>
+Do NOT merge characters who:
+- Simply have similar roles (two different doctors)
+- Have generic titles without clear connection
+- Are distinct people who happen to share a title
+</warning>
+
+## How to Merge
+
+<rules>
+1. Choose the BEST canonicalName (prefer surname > first name > title)
+2. Combine ALL variations from both characters
+3. Keep the most specific gender (prefer male/female over unknown)
+</rules>
+
+## Output Format
+
+<format>
+Return ONLY valid JSON (no markdown, no explanation):
+{
+  "merges": [
+    {
+      "keep": "BestCanonicalName",
+      "absorb": ["OtherName1", "OtherName2"],
+      "variations": ["all", "combined", "variations"],
+      "gender": "male|female|unknown"
+    }
+  ],
+  "unchanged": ["Character1", "Character2"]
+}
+
+- "keep": the canonical name to use for merged character
+- "absorb": canonical names being merged into "keep"
+- "unchanged": canonical names of characters that don't need merging
+</format>`;
+
+    const characterList = characters
+      .map((c, i) => `${i + 1}. canonicalName: "${c.canonicalName}", variations: ${JSON.stringify(c.variations)}, gender: ${c.gender}`)
+      .join('\n');
+
+    const user = `<characters>
+${characterList}
+</characters>`;
+
+    return { system, user };
+  }
+
+  /**
+   * Validate Merge response
+   */
+  private validateMergeResponse(response: string, characters: LLMCharacter[]): LLMValidationResult {
+    const errors: string[] = [];
+    const validNames = new Set(characters.map((c) => c.canonicalName));
+
+    try {
+      const parsed = JSON.parse(response) as MergeResponse;
+
+      if (!parsed.merges || !Array.isArray(parsed.merges)) {
+        errors.push('Response must have a "merges" array');
+        return { valid: false, errors };
+      }
+
+      if (!parsed.unchanged || !Array.isArray(parsed.unchanged)) {
+        errors.push('Response must have an "unchanged" array');
+        return { valid: false, errors };
+      }
+
+      // Validate merges
+      const usedNames = new Set<string>();
+      for (let i = 0; i < parsed.merges.length; i++) {
+        const merge = parsed.merges[i];
+
+        if (!merge.keep || typeof merge.keep !== 'string') {
+          errors.push(`Merge ${i}: missing or invalid "keep"`);
+        } else if (!validNames.has(merge.keep)) {
+          errors.push(`Merge ${i}: "keep" name "${merge.keep}" not found in characters`);
+        } else {
+          usedNames.add(merge.keep);
+        }
+
+        if (!merge.absorb || !Array.isArray(merge.absorb)) {
+          errors.push(`Merge ${i}: missing or invalid "absorb" array`);
+        } else {
+          for (const name of merge.absorb) {
+            if (!validNames.has(name)) {
+              errors.push(`Merge ${i}: absorbed name "${name}" not found in characters`);
+            } else {
+              usedNames.add(name);
+            }
+          }
+        }
+
+        if (!merge.variations || !Array.isArray(merge.variations)) {
+          errors.push(`Merge ${i}: missing or invalid "variations" array`);
+        }
+
+        if (!['male', 'female', 'unknown'].includes(merge.gender)) {
+          errors.push(`Merge ${i}: gender must be "male", "female", or "unknown"`);
+        }
+      }
+
+      // Validate unchanged
+      for (const name of parsed.unchanged) {
+        if (!validNames.has(name)) {
+          errors.push(`Unchanged name "${name}" not found in characters`);
+        } else {
+          usedNames.add(name);
+        }
+      }
+
+      // Check all characters are accounted for
+      for (const char of characters) {
+        if (!usedNames.has(char.canonicalName)) {
+          errors.push(`Character "${char.canonicalName}" not found in merges or unchanged`);
+        }
+      }
+    } catch (e) {
+      errors.push(`Invalid JSON: ${(e as Error).message}`);
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Apply merge response to create final character list
+   */
+  private applyMergeResponse(characters: LLMCharacter[], mergeResponse: MergeResponse): LLMCharacter[] {
+    const result: LLMCharacter[] = [];
+    const characterMap = new Map(characters.map((c) => [c.canonicalName, c]));
+
+    // Add merged characters
+    for (const merge of mergeResponse.merges) {
+      result.push({
+        canonicalName: merge.keep,
+        variations: merge.variations,
+        gender: merge.gender,
+      });
+    }
+
+    // Add unchanged characters
+    for (const name of mergeResponse.unchanged) {
+      const char = characterMap.get(name);
+      if (char) {
+        result.push({ ...char });
+      }
+    }
+
+    return result;
   }
 
   /**
