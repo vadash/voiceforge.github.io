@@ -23,4 +23,7 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+
+# User
 /.claude/
+test.config.local.ts

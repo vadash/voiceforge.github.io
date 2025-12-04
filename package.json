@@ -9,6 +9,7 @@
     "preview": "npx serve dist",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:real": "vitest run --config vitest.real.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },

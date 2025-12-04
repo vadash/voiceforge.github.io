@@ -1,0 +1,5 @@
+export const testConfig = {
+  apiKey: '',      // Your API key here
+  apiUrl: '',      // e.g., https://api.openai.com/v1
+  model: '',       // e.g., gpt-4o-mini
+};
