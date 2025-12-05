@@ -51,7 +51,8 @@ export class VoiceAssignmentStep extends BasePipelineStep {
     // Assign voices
     const voiceMap = assigner.assignVoicesFromLLMCharacters(characters);
 
-    this.reportProgress(characters.length, characters.length, `Assigned ${voiceMap.size} voice(s)`);
+    const uniqueVoices = new Set(voiceMap.values()).size;
+    this.reportProgress(characters.length, characters.length, `Assigned ${uniqueVoices} voice(s) to ${characters.length} character(s)`);
 
     return {
       ...context,
