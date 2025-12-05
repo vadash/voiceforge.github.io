@@ -11,13 +11,13 @@ import * as path from 'path';
  * Test helpers for LLM real API tests
  */
 
-export interface Pass1Result {
+export interface ExtractResult {
   characters: LLMCharacter[];
   blockCount: number;
   durationMs: number;
 }
 
-export interface Pass2Result {
+export interface AssignResult {
   assignments: SpeakerAssignment[];
   blockCount: number;
   dialogueCount: number;
@@ -72,18 +72,18 @@ export function loadFixtureText(filename: string): string {
 }
 
 /**
- * Run Pass 1 (character extraction)
+ * Run Extract (character extraction)
  */
-export async function runPass1(
+export async function runExtract(
   service: LLMVoiceService,
   splitter: TextBlockSplitter,
   text: string,
   verbose = true
-): Promise<Pass1Result> {
-  const blocks = splitter.createPass1Blocks(text);
+): Promise<ExtractResult> {
+  const blocks = splitter.createExtractBlocks(text);
 
   if (verbose) {
-    console.log(`  Pass 1: Processing ${blocks.length} block(s)...`);
+    console.log(`  Extract: Processing ${blocks.length} block(s)...`);
   }
 
   const startTime = Date.now();
@@ -102,16 +102,16 @@ export async function runPass1(
 }
 
 /**
- * Run Pass 2 (speaker assignment)
+ * Run Assign (speaker assignment)
  */
-export async function runPass2(
+export async function runAssign(
   service: LLMVoiceService,
   splitter: TextBlockSplitter,
   text: string,
   characters: LLMCharacter[],
   verbose = true
-): Promise<Pass2Result> {
-  const blocks = splitter.createPass2Blocks(text);
+): Promise<AssignResult> {
+  const blocks = splitter.createAssignBlocks(text);
 
   // Build character voice map
   const characterVoiceMap = new Map<string, string>();
@@ -120,7 +120,7 @@ export async function runPass2(
   });
 
   if (verbose) {
-    console.log(`  Pass 2: Processing ${blocks.length} block(s)...`);
+    console.log(`  Assign: Processing ${blocks.length} block(s)...`);
   }
 
   const startTime = Date.now();
@@ -198,10 +198,10 @@ export function checkDialogue(
 }
 
 /**
- * Log Pass 1 results
+ * Log Extract results
  */
-export function logPass1Results(result: Pass1Result): void {
-  console.log('\n  === Pass 1 Results ===');
+export function logExtractResults(result: ExtractResult): void {
+  console.log('\n  === Extract Results ===');
   console.log(`  Duration: ${result.durationMs}ms`);
   console.log(`  Characters found: ${result.characters.length}`);
   result.characters.forEach(c => {
@@ -213,10 +213,10 @@ export function logPass1Results(result: Pass1Result): void {
 }
 
 /**
- * Log Pass 2 results
+ * Log Assign results
  */
-export function logPass2Results(result: Pass2Result): void {
-  console.log('\n  === Pass 2 Results ===');
+export function logAssignResults(result: AssignResult): void {
+  console.log('\n  === Assign Results ===');
   console.log(`  Duration: ${result.durationMs}ms`);
   console.log(`  Total sentences: ${result.assignments.length}`);
   console.log(`  Dialogue sentences: ${result.dialogueCount}`);

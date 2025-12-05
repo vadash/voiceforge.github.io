@@ -179,13 +179,13 @@ export type LLMProgressCallback = (current: number, total: number) => void;
  * LLM service for character extraction and speaker assignment
  */
 export interface ILLMService {
-  /** Pass 1: Extract characters from text blocks */
+  /** Extract: Extract characters from text blocks */
   extractCharacters(
     blocks: TextBlock[],
     onProgress?: LLMProgressCallback
   ): Promise<LLMCharacter[]>;
 
-  /** Pass 2: Assign speakers to sentences */
+  /** Assign: Assign speakers to sentences */
   assignSpeakers(
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
@@ -347,10 +347,10 @@ export interface IFileConverter {
  * Splits text into blocks suitable for LLM token limits
  */
 export interface ITextBlockSplitter {
-  /** Create blocks for Pass 1 (character extraction) */
-  createPass1Blocks(text: string): TextBlock[];
-  /** Create blocks for Pass 2 (speaker assignment) */
-  createPass2Blocks(text: string): TextBlock[];
+  /** Create blocks for Extract (character extraction) */
+  createExtractBlocks(text: string): TextBlock[];
+  /** Create blocks for Assign (speaker assignment) */
+  createAssignBlocks(text: string): TextBlock[];
 }
 
 // ============================================================================

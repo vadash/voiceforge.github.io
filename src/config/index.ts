@@ -50,10 +50,10 @@ export interface AudioConfig {
 }
 
 export interface LLMConfig {
-  /** Token limit for Pass 1 blocks */
-  pass1BlockTokens: number;
-  /** Token limit for Pass 2 blocks */
-  pass2BlockTokens: number;
+  /** Token limit for Extract blocks */
+  extractBlockTokens: number;
+  /** Token limit for Assign blocks */
+  assignBlockTokens: number;
   /** Maximum concurrent API requests */
   maxConcurrentRequests: number;
   /** Retry delays in ms (array for sequential delays) */
@@ -127,8 +127,8 @@ export const defaultConfig: AppConfig = {
   },
 
   llm: {
-    pass1BlockTokens: 16000,
-    pass2BlockTokens: 8000,
+    extractBlockTokens: 16000,
+    assignBlockTokens: 8000,
     maxConcurrentRequests: 20,
     retryDelays: [5000, 10000, 20000, 60000, 180000, 600000, 1200000, 2400000, 4800000],
     maxTokens: 4000,

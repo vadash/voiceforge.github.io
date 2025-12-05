@@ -109,13 +109,13 @@ export interface PipelineContext {
   dictionaryRules: string[];
   detectedLanguage: string;
 
-  // LLM Pass 1 output
+  // LLM Extract output
   characters?: LLMCharacter[];
 
   // Voice assignment output
   voiceMap?: Map<string, string>;
 
-  // LLM Pass 2 output
+  // LLM Assign output
   assignments?: SpeakerAssignment[];
 
   // TTS output

@@ -45,7 +45,7 @@ export function createDefaultStepRegistry(): StepRegistry {
   registry.register<CharacterExtractionStepOptions>(
     StepNames.CHARACTER_EXTRACTION,
     (options) => new CharacterExtractionStep(options),
-    'Extracts characters from text using LLM (Pass 1)'
+    'Extracts characters from text using LLM (Extract)'
   );
 
   registry.register<VoiceAssignmentStepOptions>(
@@ -57,7 +57,7 @@ export function createDefaultStepRegistry(): StepRegistry {
   registry.register<SpeakerAssignmentStepOptions>(
     StepNames.SPEAKER_ASSIGNMENT,
     (options) => new SpeakerAssignmentStep(options),
-    'Assigns speakers to sentences using LLM (Pass 2)'
+    'Assigns speakers to sentences using LLM (Assign)'
   );
 
   registry.register<Record<string, never>>(

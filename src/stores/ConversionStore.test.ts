@@ -29,14 +29,14 @@ describe('ConversionStore', () => {
   });
 
   describe('status transitions', () => {
-    it('sets status to llm-pass1', () => {
-      store.setStatus('llm-pass1');
-      expect(store.status.value).toBe('llm-pass1');
+    it('sets status to llm-extract', () => {
+      store.setStatus('llm-extract');
+      expect(store.status.value).toBe('llm-extract');
     });
 
-    it('sets status to llm-pass2', () => {
-      store.setStatus('llm-pass2');
-      expect(store.status.value).toBe('llm-pass2');
+    it('sets status to llm-assign', () => {
+      store.setStatus('llm-assign');
+      expect(store.status.value).toBe('llm-assign');
     });
 
     it('sets status to converting', () => {
@@ -71,13 +71,13 @@ describe('ConversionStore', () => {
       expect(store.isProcessing.value).toBe(false);
     });
 
-    it('returns true for llm-pass1', () => {
-      store.setStatus('llm-pass1');
+    it('returns true for llm-extract', () => {
+      store.setStatus('llm-extract');
       expect(store.isProcessing.value).toBe(true);
     });
 
-    it('returns true for llm-pass2', () => {
-      store.setStatus('llm-pass2');
+    it('returns true for llm-assign', () => {
+      store.setStatus('llm-assign');
       expect(store.isProcessing.value).toBe(true);
     });
 

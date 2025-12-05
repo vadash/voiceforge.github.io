@@ -135,8 +135,8 @@ export class ConversionOrchestrator {
     // Update store status based on step
     switch (progress.step) {
       case StepNames.CHARACTER_EXTRACTION:
-        this.stores.conversion.setStatus('llm-pass1');
-        this.stores.llm.setProcessingStatus('pass1');
+        this.stores.conversion.setStatus('llm-extract');
+        this.stores.llm.setProcessingStatus('extracting');
         this.stores.llm.setBlockProgress(progress.current, progress.total);
         break;
 
@@ -145,8 +145,8 @@ export class ConversionOrchestrator {
         break;
 
       case StepNames.SPEAKER_ASSIGNMENT:
-        this.stores.conversion.setStatus('llm-pass2');
-        this.stores.llm.setProcessingStatus('pass2');
+        this.stores.conversion.setStatus('llm-assign');
+        this.stores.llm.setProcessingStatus('assigning');
         this.stores.llm.setBlockProgress(progress.current, progress.total);
         break;
 

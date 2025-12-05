@@ -1,5 +1,5 @@
 // Speaker Assignment Step
-// LLM Pass 2 - Assigns speakers to each sentence
+// LLM Assign - Assigns speakers to each sentence
 
 import { BasePipelineStep, PipelineContext } from '../types';
 import type { ILLMService, ITextBlockSplitter, LLMServiceFactoryOptions } from '@/services/interfaces';
@@ -15,7 +15,7 @@ export interface SpeakerAssignmentStepOptions {
 
 /**
  * Assigns speakers to sentences using LLM
- * This is Pass 2 of the LLM voice assignment system
+ * This is Assign phase of the LLM voice assignment system
  */
 export class SpeakerAssignmentStep extends BasePipelineStep {
   readonly name = 'speaker-assignment';
@@ -44,7 +44,7 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
 
     try {
       // Split text into blocks for processing
-      const blocks = this.options.textBlockSplitter.createPass2Blocks(context.text);
+      const blocks = this.options.textBlockSplitter.createAssignBlocks(context.text);
 
       this.reportProgress(0, blocks.length, `Processing ${blocks.length} block(s)...`);
 
@@ -54,7 +54,7 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
         voiceMap,
         characters,
         (current, total) => {
-          this.reportProgress(current, total, `Pass 2: Block ${current}/${total}`);
+          this.reportProgress(current, total, `Assign: Block ${current}/${total}`);
         }
       );
 

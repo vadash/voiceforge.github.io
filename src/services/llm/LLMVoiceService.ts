@@ -1,7 +1,7 @@
 import type {
   TextBlock,
   LLMCharacter,
-  Pass1Response,
+  ExtractResponse,
   SpeakerAssignment,
   MergeResponse,
 } from '@/state/types';
@@ -54,7 +54,7 @@ export class LLMVoiceService {
   }
 
   /**
-   * Pass 1: Extract characters from text blocks (sequential)
+   * Extract: Extract characters from text blocks (sequential)
    */
   async extractCharacters(
     blocks: TextBlock[],
@@ -82,7 +82,7 @@ export class LLMVoiceService {
         'extract'
       );
 
-      const parsed = JSON.parse(response) as Pass1Response;
+      const parsed = JSON.parse(response) as ExtractResponse;
       allCharacters.push(...parsed.characters);
     }
 
@@ -98,7 +98,7 @@ export class LLMVoiceService {
   }
 
   /**
-   * Pass 2: Assign speakers to sentences (parallel, up to 20 concurrent)
+   * Assign: Assign speakers to sentences (parallel, up to 20 concurrent)
    */
   async assignSpeakers(
     blocks: TextBlock[],
@@ -141,7 +141,7 @@ export class LLMVoiceService {
   }
 
   /**
-   * Process a single block for Pass 2
+   * Process a single block for Assign
    */
   private async processAssignBlock(
     block: TextBlock,

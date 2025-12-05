@@ -82,13 +82,13 @@ describe('LLMStore', () => {
         expect(store.isProcessing.value).toBe(false);
       });
 
-      it('returns true for pass1', () => {
-        store.setProcessingStatus('pass1');
+      it('returns true for extract', () => {
+        store.setProcessingStatus('extracting');
         expect(store.isProcessing.value).toBe(true);
       });
 
-      it('returns true for pass2', () => {
-        store.setProcessingStatus('pass2');
+      it('returns true for assign', () => {
+        store.setProcessingStatus('assigning');
         expect(store.isProcessing.value).toBe(true);
       });
 
@@ -157,8 +157,8 @@ describe('LLMStore', () => {
 
   describe('processing state actions', () => {
     it('sets processing status', () => {
-      store.setProcessingStatus('pass1');
-      expect(store.processingStatus.value).toBe('pass1');
+      store.setProcessingStatus('extracting');
+      expect(store.processingStatus.value).toBe('extracting');
     });
 
     it('sets block progress', () => {
@@ -174,10 +174,10 @@ describe('LLMStore', () => {
     });
 
     it('clears error without changing status', () => {
-      store.setProcessingStatus('pass1');
+      store.setProcessingStatus('extracting');
       store.setError(null);
       expect(store.error.value).toBeNull();
-      expect(store.processingStatus.value).toBe('pass1');
+      expect(store.processingStatus.value).toBe('extracting');
     });
   });
 
@@ -241,7 +241,7 @@ describe('LLMStore', () => {
   describe('state management', () => {
     it('resets processing state but keeps settings', () => {
       store.setApiKey('sk-key');
-      store.setProcessingStatus('pass1');
+      store.setProcessingStatus('extracting');
       store.setBlockProgress(5, 10);
       store.setError('Error');
       store.setCharacters([{ code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] }]);
@@ -264,7 +264,7 @@ describe('LLMStore', () => {
       store.setApiUrl('https://custom.api.com');
       store.setModel('gpt-4');
       store.setEnabled(false);
-      store.setProcessingStatus('pass1');
+      store.setProcessingStatus('extracting');
 
       store.reset();
 

@@ -10,8 +10,8 @@ describe('CharacterExtractionStep', () => {
   let mockTextBlockSplitter: ITextBlockSplitter;
 
   const createMockSplitter = (blocks: TextBlock[]): ITextBlockSplitter => ({
-    createPass1Blocks: vi.fn(() => blocks),
-    createPass2Blocks: vi.fn(() => blocks),
+    createExtractBlocks: vi.fn(() => blocks),
+    createAssignBlocks: vi.fn(() => blocks),
     splitIntoSentences: vi.fn((text: string) => text.split('. ').filter(Boolean).map(s => s.endsWith('.') ? s : s + '.')),
   });
 
@@ -67,11 +67,11 @@ describe('CharacterExtractionStep', () => {
       expect(result.dictionaryRules).toHaveLength(1);
     });
 
-    it('uses text block splitter for pass1 blocks', async () => {
+    it('uses text block splitter for extract blocks', async () => {
       const context = createTestContext({ text: 'Some text content.' });
       await step.execute(context, createNeverAbortSignal());
 
-      expect(mockTextBlockSplitter.createPass1Blocks).toHaveBeenCalledWith('Some text content.');
+      expect(mockTextBlockSplitter.createExtractBlocks).toHaveBeenCalledWith('Some text content.');
     });
   });
 

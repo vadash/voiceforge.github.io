@@ -1,5 +1,5 @@
 // Character Extraction Step
-// LLM Pass 1 - Extracts characters from text blocks
+// LLM Extract - Extracts characters from text blocks
 
 import { BasePipelineStep, PipelineContext } from '../types';
 import type { ILLMService, ITextBlockSplitter, LLMServiceFactoryOptions } from '@/services/interfaces';
@@ -15,7 +15,7 @@ export interface CharacterExtractionStepOptions {
 
 /**
  * Extracts characters from text using LLM
- * This is Pass 1 of the LLM voice assignment system
+ * This is Extract phase of the LLM voice assignment system
  */
 export class CharacterExtractionStep extends BasePipelineStep {
   readonly name = 'character-extraction';
@@ -39,13 +39,13 @@ export class CharacterExtractionStep extends BasePipelineStep {
 
     try {
       // Split text into blocks for processing
-      const blocks = this.options.textBlockSplitter.createPass1Blocks(context.text);
+      const blocks = this.options.textBlockSplitter.createExtractBlocks(context.text);
 
       this.reportProgress(0, blocks.length, `Processing ${blocks.length} block(s)...`);
 
       // Extract characters
       const characters = await this.llmService.extractCharacters(blocks, (current, total) => {
-        this.reportProgress(current, total, `Pass 1: Block ${current}/${total}`);
+        this.reportProgress(current, total, `Extract: Block ${current}/${total}`);
       });
 
       this.reportProgress(blocks.length, blocks.length, `Detected ${characters.length} character(s)`);

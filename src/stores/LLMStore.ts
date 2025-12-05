@@ -10,7 +10,7 @@ import { StorageKeys } from '@/config/storage';
 /**
  * LLM processing status
  */
-export type LLMProcessingStatus = 'idle' | 'pass1' | 'review' | 'pass2' | 'error';
+export type LLMProcessingStatus = 'idle' | 'extracting' | 'review' | 'assigning' | 'error';
 
 /**
  * LLM settings for persistence
@@ -70,7 +70,7 @@ export class LLMStore {
    */
   readonly isProcessing = computed(() => {
     const status = this.processingStatus.value;
-    return status === 'pass1' || status === 'pass2';
+    return status === 'extracting' || status === 'assigning';
   });
 
   /**

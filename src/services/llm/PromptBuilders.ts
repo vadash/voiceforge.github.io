@@ -3,7 +3,7 @@ import type { LLMPrompt } from './LLMApiClient';
 import { LLM_PROMPTS } from '@/config/prompts';
 
 /**
- * Build Extract prompt (character extraction - Pass 1)
+ * Build Extract prompt (character extraction)
  */
 export function buildExtractPrompt(textBlock: string): LLMPrompt {
   return {
@@ -27,7 +27,7 @@ export function buildMergePrompt(characters: LLMCharacter[]): LLMPrompt {
 }
 
 /**
- * Build Assign prompt (speaker assignment - Pass 2)
+ * Build Assign prompt (speaker assignment)
  */
 export function buildAssignPrompt(
   characters: LLMCharacter[],

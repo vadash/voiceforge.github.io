@@ -20,8 +20,8 @@ describe('SpeakerAssignmentStep', () => {
   ]);
 
   const createMockSplitter = (blocks: TextBlock[]): ITextBlockSplitter => ({
-    createPass1Blocks: vi.fn(() => blocks),
-    createPass2Blocks: vi.fn(() => blocks),
+    createExtractBlocks: vi.fn(() => blocks),
+    createAssignBlocks: vi.fn(() => blocks),
     splitIntoSentences: vi.fn((text: string) => text.split('. ').filter(Boolean)),
   });
 
@@ -95,14 +95,14 @@ describe('SpeakerAssignmentStep', () => {
       expect(result.voiceMap).toBe(testVoiceMap);
     });
 
-    it('uses text block splitter for pass2 blocks', async () => {
+    it('uses text block splitter for assign blocks', async () => {
       const context = createContextWithVoiceMap(testCharacters, testVoiceMap, {
         text: 'Some dialogue text.',
       });
 
       await step.execute(context, createNeverAbortSignal());
 
-      expect(mockTextBlockSplitter.createPass2Blocks).toHaveBeenCalledWith('Some dialogue text.');
+      expect(mockTextBlockSplitter.createAssignBlocks).toHaveBeenCalledWith('Some dialogue text.');
     });
   });
 

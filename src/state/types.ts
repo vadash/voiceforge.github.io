@@ -140,11 +140,11 @@ export interface TextBlock {
   sentenceStartIndex: number;
 }
 
-export interface Pass1Response {
+export interface ExtractResponse {
   characters: LLMCharacter[];
 }
 
-export interface Pass2Response {
+export interface AssignResponse {
   sentences: Array<{ index: number; speaker: string }>;
 }
 

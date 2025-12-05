@@ -204,17 +204,17 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Create blocks for Pass 1 (character extraction) - larger blocks
+   * Create blocks for Extract (character extraction) - larger blocks
    */
-  createPass1Blocks(text: string): TextBlock[] {
+  createExtractBlocks(text: string): TextBlock[] {
     const sentences = this.splitIntoSentences(text);
     return this.splitIntoBlocks(sentences, 16000);
   }
 
   /**
-   * Create blocks for Pass 2 (speaker assignment) - smaller blocks
+   * Create blocks for Assign (speaker assignment) - smaller blocks
    */
-  createPass2Blocks(text: string): TextBlock[] {
+  createAssignBlocks(text: string): TextBlock[] {
     const sentences = this.splitIntoSentences(text);
     return this.splitIntoBlocks(sentences, 8000);
   }

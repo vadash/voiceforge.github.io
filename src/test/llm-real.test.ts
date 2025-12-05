@@ -4,21 +4,21 @@ import {
   createService,
   createSplitter,
   loadFixtureText,
-  runPass1,
-  runPass2,
+  runExtract,
+  runAssign,
   checkDialogue,
-  logPass1Results,
-  logPass2Results,
+  logExtractResults,
+  logAssignResults,
   logDialogueChecks,
   getValidSpeakers,
-  type Pass1Result,
-  type Pass2Result,
+  type ExtractResult,
+  type AssignResult,
 } from './llm-test-helpers';
 import type { LLMVoiceService } from '@/services/llm';
 import type { TextBlockSplitter } from '@/services/TextBlockSplitter';
 
 /**
- * Real API tests for LLM Pass 1 (character extraction) and Pass 2 (speaker assignment)
+ * Real API tests for LLM Extract and Assign (speaker assignment)
  *
  * These tests use actual API calls and are excluded from regular `npm test`.
  * Run with: npm run test:real
@@ -42,8 +42,8 @@ describe('LLM Real API Tests', () => {
   // Run tests for each fixture
   describe.each(fixtures)('Fixture: $name', (fixture: TestFixture) => {
     let text: string;
-    let pass1Result: Pass1Result;
-    let pass2Result: Pass2Result;
+    let extractResult: ExtractResult;
+    let assignResult: AssignResult;
 
     beforeAll(async () => {
       console.log(`\n${'='.repeat(60)}`);
@@ -54,26 +54,26 @@ describe('LLM Real API Tests', () => {
       // Load fixture text
       text = loadFixtureText(fixture.file);
 
-      // Run Pass 1
-      pass1Result = await runPass1(service, splitter, text);
-      logPass1Results(pass1Result);
+      // Run Extract
+      extractResult = await runExtract(service, splitter, text);
+      logExtractResults(extractResult);
 
-      // Run Pass 2
-      pass2Result = await runPass2(service, splitter, text, pass1Result.characters);
-      logPass2Results(pass2Result);
+      // Run Assign
+      assignResult = await runAssign(service, splitter, text, extractResult.characters);
+      logAssignResults(assignResult);
     }, 180000); // 3 min timeout for both passes
 
-    describe('Pass 1 - Character Extraction', () => {
+    describe('Extract - Character Extraction', () => {
       it('should extract expected characters', () => {
         for (const expected of fixture.expectedCharacters) {
-          const found = findCharacter(pass1Result.characters, expected.name);
+          const found = findCharacter(extractResult.characters, expected.name);
           expect(found, `Character "${expected.name}" not found`).toBeDefined();
         }
       });
 
       it('should detect character genders correctly', () => {
         for (const expected of fixture.expectedCharacters) {
-          const found = findCharacter(pass1Result.characters, expected.name);
+          const found = findCharacter(extractResult.characters, expected.name);
           if (found) {
             expect(found.gender).toBe(expected.gender);
           }
@@ -81,20 +81,20 @@ describe('LLM Real API Tests', () => {
       });
 
       it('should not have unexpected empty results', () => {
-        expect(pass1Result.characters.length).toBeGreaterThan(0);
+        expect(extractResult.characters.length).toBeGreaterThan(0);
       });
     });
 
-    describe('Pass 2 - Speaker Assignment', () => {
+    describe('Assign - Speaker Assignment', () => {
       it('should assign speakers to dialogue', () => {
-        expect(pass2Result.dialogueCount).toBeGreaterThan(0);
+        expect(assignResult.dialogueCount).toBeGreaterThan(0);
       });
 
       it('should only use valid speakers', () => {
-        const canonicalNames = pass1Result.characters.map(c => c.canonicalName);
+        const canonicalNames = extractResult.characters.map(c => c.canonicalName);
         const validSpeakers = getValidSpeakers(canonicalNames);
 
-        for (const assignment of pass2Result.assignments) {
+        for (const assignment of assignResult.assignments) {
           expect(
             validSpeakers.has(assignment.speaker),
             `Invalid speaker: ${assignment.speaker}`
@@ -104,7 +104,7 @@ describe('LLM Real API Tests', () => {
 
       it('should attribute dialogue lines correctly', () => {
         const results = fixture.expectedDialogueLines.map(expected =>
-          checkDialogue(pass2Result.assignments, expected, pass1Result.characters)
+          checkDialogue(assignResult.assignments, expected, extractResult.characters)
         );
 
         logDialogueChecks(results);

@@ -8,8 +8,8 @@ import { signal, computed, effect } from '@preact/signals';
  */
 export type ConversionStatus =
   | 'idle'
-  | 'llm-pass1'
-  | 'llm-pass2'
+  | 'llm-extract'
+  | 'llm-assign'
   | 'converting'
   | 'merging'
   | 'complete'
@@ -70,7 +70,7 @@ export class ConversionStore {
    */
   readonly isProcessing = computed(() => {
     const s = this.status.value;
-    return s === 'llm-pass1' || s === 'llm-pass2' || s === 'converting' || s === 'merging';
+    return s === 'llm-extract' || s === 'llm-assign' || s === 'converting' || s === 'merging';
   });
 
   /**
