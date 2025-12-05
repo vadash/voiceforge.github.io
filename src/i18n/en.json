@@ -5,7 +5,9 @@
   "nav": {
     "convert": "Convert",
     "settings": "Settings",
-    "logs": "Logs"
+    "logs": "Logs",
+    "about": "About",
+    "changelog": "Changelog"
   },
   "settings": {
     "toggle": "Settings",
@@ -68,7 +70,7 @@
     "formats": "txt, fb2, epub, ini, zip"
   },
   "convert": {
-    "button": "Save to MP3",
+    "button": "Convert",
     "selectFolder": "Select folder to save"
   },
   "status": {

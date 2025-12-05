@@ -3,6 +3,7 @@ import { Router } from './router';
 import { ConvertView } from './components/convert';
 import { SettingsView } from './components/settings';
 import { StatusView } from './components/status';
+import { AboutView, ChangelogView } from './components/info';
 
 export function App() {
   return (
@@ -11,6 +12,8 @@ export function App() {
         convertView={<ConvertView />}
         settingsView={<SettingsView />}
         logsView={<StatusView />}
+        aboutView={<AboutView />}
+        changelogView={<ChangelogView />}
       />
     </AppShell>
   );

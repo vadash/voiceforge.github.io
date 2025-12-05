@@ -4,6 +4,8 @@ export const routes = {
   convert: '#/',
   settings: '#/settings',
   logs: '#/logs',
+  about: '#/about',
+  changelog: '#/changelog',
 } as const;
 
 export type RouteKey = keyof typeof routes;
@@ -31,6 +33,8 @@ export const isConvertRoute = computed(() =>
 );
 export const isSettingsRoute = computed(() => currentHash.value === routes.settings);
 export const isLogsRoute = computed(() => currentHash.value === routes.logs);
+export const isAboutRoute = computed(() => currentHash.value === routes.about);
+export const isChangelogRoute = computed(() => currentHash.value === routes.changelog);
 
 // Hook for current route
 export function useRoute() {
@@ -39,6 +43,8 @@ export function useRoute() {
     isConvert: isConvertRoute.value,
     isSettings: isSettingsRoute.value,
     isLogs: isLogsRoute.value,
+    isAbout: isAboutRoute.value,
+    isChangelog: isChangelogRoute.value,
     navigate,
   };
 }
