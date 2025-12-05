@@ -101,6 +101,7 @@ export interface MergerConfig {
   outputFormat: 'mp3' | 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
+  deEss: boolean;
 }
 
 /**
@@ -210,6 +211,7 @@ export interface ILLMService {
 export interface AudioProcessingOptions {
   silenceRemoval: boolean;
   normalization: boolean;
+  deEss: boolean;
 }
 
 /**

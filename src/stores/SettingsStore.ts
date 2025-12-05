@@ -24,6 +24,7 @@ const defaultSettings: AppSettings = {
   outputFormat: 'opus',
   silenceRemovalEnabled: true,
   normalizationEnabled: false,
+  deEssEnabled: false,
 };
 
 /**
@@ -47,6 +48,7 @@ export class SettingsStore {
   readonly outputFormat = signal<'mp3' | 'opus'>(defaultSettings.outputFormat);
   readonly silenceRemovalEnabled = signal<boolean>(defaultSettings.silenceRemovalEnabled);
   readonly normalizationEnabled = signal<boolean>(defaultSettings.normalizationEnabled);
+  readonly deEssEnabled = signal<boolean>(defaultSettings.deEssEnabled);
 
   // Text processing settings
   readonly lexxRegister = signal<boolean>(defaultSettings.lexxRegister);
@@ -135,6 +137,16 @@ export class SettingsStore {
     this.save();
   }
 
+  toggleDeEss(): void {
+    this.deEssEnabled.value = !this.deEssEnabled.value;
+    this.save();
+  }
+
+  setDeEssEnabled(value: boolean): void {
+    this.deEssEnabled.value = value;
+    this.save();
+  }
+
   // ========== Text Processing Setters ==========
 
   setLexxRegister(value: boolean): void {
@@ -190,6 +202,7 @@ export class SettingsStore {
       outputFormat: this.outputFormat.value,
       silenceRemovalEnabled: this.silenceRemovalEnabled.value,
       normalizationEnabled: this.normalizationEnabled.value,
+      deEssEnabled: this.deEssEnabled.value,
     };
     localStorage.setItem(StorageKeys.settings, JSON.stringify(settings));
   }
@@ -217,6 +230,7 @@ export class SettingsStore {
         this.outputFormat.value = settings.outputFormat ?? defaultSettings.outputFormat;
         this.silenceRemovalEnabled.value = settings.silenceRemovalEnabled ?? defaultSettings.silenceRemovalEnabled;
         this.normalizationEnabled.value = settings.normalizationEnabled ?? defaultSettings.normalizationEnabled;
+        this.deEssEnabled.value = settings.deEssEnabled ?? defaultSettings.deEssEnabled;
       }
     } catch (e) {
       this.logStore.error(
@@ -245,6 +259,7 @@ export class SettingsStore {
     this.outputFormat.value = defaultSettings.outputFormat;
     this.silenceRemovalEnabled.value = defaultSettings.silenceRemovalEnabled;
     this.normalizationEnabled.value = defaultSettings.normalizationEnabled;
+    this.deEssEnabled.value = defaultSettings.deEssEnabled;
     this.save();
   }
 
@@ -267,6 +282,7 @@ export class SettingsStore {
       outputFormat: this.outputFormat.value,
       silenceRemovalEnabled: this.silenceRemovalEnabled.value,
       normalizationEnabled: this.normalizationEnabled.value,
+      deEssEnabled: this.deEssEnabled.value,
     };
   }
 }

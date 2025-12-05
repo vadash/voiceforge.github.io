@@ -67,6 +67,22 @@ export function AudioTab() {
             />
           </div>
 
+          {/* De-Ess */}
+          <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
+            <div>
+              <div className="font-medium">
+                <Text id="settings.deEss">De-Ess</Text>
+              </div>
+              <div className="text-sm text-gray-400">
+                <Text id="settings.deEssHint">Reduce harsh sibilant sounds</Text>
+              </div>
+            </div>
+            <Toggle
+              checked={settings.deEssEnabled.value}
+              onChange={(v) => settings.setDeEssEnabled(v)}
+            />
+          </div>
+
           {/* FFmpeg Warning */}
           {conversion.ffmpegError.value && (
             <div className="p-3 rounded-lg bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">

@@ -11,6 +11,7 @@ export interface AudioMergeStepOptions {
   outputFormat: 'mp3' | 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
+  deEss: boolean;
   ffmpegService: IFFmpegService;
   createAudioMerger: (config: MergerConfig) => IAudioMerger;
 }
@@ -64,6 +65,7 @@ export class AudioMergeStep extends BasePipelineStep {
       outputFormat: useOpus ? 'opus' : 'mp3',
       silenceRemoval: this.options.silenceRemoval,
       normalization: this.options.normalization,
+      deEss: this.options.deEss,
     });
 
     // Calculate total chunks for progress

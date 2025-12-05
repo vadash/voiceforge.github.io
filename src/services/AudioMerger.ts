@@ -24,6 +24,7 @@ export interface MergerConfig {
   outputFormat: 'mp3' | 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
+  deEss: boolean;
 }
 
 /**
@@ -219,6 +220,7 @@ export class AudioMerger implements IAudioMerger {
           {
             silenceRemoval: this.config.silenceRemoval,
             normalization: this.config.normalization,
+            deEss: this.config.deEss,
           },
           onProgress
         );

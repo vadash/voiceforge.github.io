@@ -23,6 +23,7 @@ export interface AppSettings {
   outputFormat: 'mp3' | 'opus';
   silenceRemovalEnabled: boolean;
   normalizationEnabled: boolean;
+  deEssEnabled: boolean;
 }
 
 export interface ProcessedBook {

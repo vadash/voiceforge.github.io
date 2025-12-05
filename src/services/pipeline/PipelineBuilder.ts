@@ -38,6 +38,7 @@ export interface PipelineBuilderOptions {
   outputFormat: 'mp3' | 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
+  deEss: boolean;
 
   // LLM settings
   apiKey: string;
@@ -135,6 +136,7 @@ export class PipelineBuilder implements IPipelineBuilder {
         outputFormat: options.outputFormat,
         silenceRemoval: options.silenceRemoval,
         normalization: options.normalization,
+        deEss: options.deEss,
         ffmpegService: this.ffmpegService,
         createAudioMerger: (cfg: MergerConfig) => this.audioMergerFactory.create(cfg),
       })

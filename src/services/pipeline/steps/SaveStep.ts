@@ -40,6 +40,7 @@ export class SaveStep extends BasePipelineStep {
       outputFormat: 'mp3',
       silenceRemoval: false,
       normalization: false,
+      deEss: false,
     });
 
     await merger.saveMergedFiles(mergedFiles, directoryHandle);

@@ -9,6 +9,7 @@ import type { ILogger, IFFmpegService, AudioProcessingOptions } from './interfac
 export interface AudioProcessingConfig {
   silenceRemoval: boolean;
   normalization: boolean;
+  deEss: boolean;
 }
 
 const CDN_MIRRORS = defaultConfig.ffmpeg.cdnMirrors;
@@ -175,6 +176,12 @@ export class FFmpegService implements IFFmpegService {
         `stop_silence=${audio.silenceStopDuration}:` +
         `stop_threshold=${audio.silenceThreshold}dB`
       );
+    }
+
+    if (config.deEss) {
+      // Native FFmpeg de-esser filter (available since FFmpeg 4.2)
+      // i=intensity (0-1), m=amount of reduction, f=center frequency, s=frequency spread
+      filters.push(`deesser=i=0.4:m=0.5:f=0.5:s=0.5`);
     }
 
     if (config.normalization) {

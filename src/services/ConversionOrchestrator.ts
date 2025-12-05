@@ -67,6 +67,7 @@ export class ConversionOrchestrator {
         outputFormat: this.stores.settings.outputFormat.value,
         silenceRemoval: this.stores.settings.silenceRemovalEnabled.value,
         normalization: this.stores.settings.normalizationEnabled.value,
+        deEss: this.stores.settings.deEssEnabled.value,
 
         // LLM settings
         apiKey: this.stores.llm.apiKey.value,
