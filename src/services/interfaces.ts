@@ -173,8 +173,11 @@ export interface LLMServiceOptions {
 
 /**
  * Progress callback for LLM operations
+ * @param current - Current progress count
+ * @param total - Total count
+ * @param message - Optional status message (e.g., "Merging characters...")
  */
-export type LLMProgressCallback = (current: number, total: number) => void;
+export type ProgressCallback = (current: number, total: number, message?: string) => void;
 
 /**
  * LLM service for character extraction and speaker assignment
@@ -183,7 +186,7 @@ export interface ILLMService {
   /** Extract: Extract characters from text blocks */
   extractCharacters(
     blocks: TextBlock[],
-    onProgress?: LLMProgressCallback
+    onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]>;
 
   /** Assign: Assign speakers to sentences */
@@ -191,7 +194,7 @@ export interface ILLMService {
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
     characters: LLMCharacter[],
-    onProgress?: LLMProgressCallback
+    onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]>;
 
   /** Cancel ongoing operations */

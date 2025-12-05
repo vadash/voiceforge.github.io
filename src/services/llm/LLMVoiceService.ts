@@ -5,7 +5,7 @@ import type {
   SpeakerAssignment,
   MergeResponse,
 } from '@/state/types';
-import type { ILogger } from '../interfaces';
+import type { ILogger, ProgressCallback } from '../interfaces';
 import { LLMApiClient } from './LLMApiClient';
 import { buildExtractPrompt, buildMergePrompt, buildAssignPrompt } from './PromptBuilders';
 import { validateExtractResponse, validateMergeResponse, validateAssignResponse, parseAssignResponse } from './ResponseValidators';
@@ -18,10 +18,6 @@ export interface LLMVoiceServiceOptions {
   narratorVoice: string;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger?: ILogger;
-}
-
-export interface ProgressCallback {
-  (current: number, total: number): void;
 }
 
 /**
@@ -94,6 +90,7 @@ export class LLMVoiceService {
 
     // LLM merge only if multiple blocks were processed and multiple characters exist
     if (blocks.length > 1 && merged.length > 1) {
+      onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
       merged = await this.mergeCharactersWithLLM(merged);
     }
 

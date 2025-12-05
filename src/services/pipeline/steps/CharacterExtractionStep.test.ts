@@ -81,7 +81,7 @@ describe('CharacterExtractionStep', () => {
       const { progress } = await collectProgress(step, context);
 
       expect(progress.length).toBeGreaterThan(0);
-      expect(progress[0].message).toContain('block');
+      expect(progress.some(p => p.message.toLowerCase().includes('block'))).toBe(true);
     });
 
     it('reports final character count', async () => {

@@ -46,8 +46,8 @@ export class CharacterExtractionStep extends BasePipelineStep {
       this.reportProgress(0, blocks.length, `Processing ${blocks.length} block(s)...`);
 
       // Extract characters
-      const characters = await this.llmService.extractCharacters(blocks, (current, total) => {
-        this.reportProgress(current, total, `Extract: Block ${current}/${total}`);
+      const characters = await this.llmService.extractCharacters(blocks, (current, total, message) => {
+        this.reportProgress(current, total, message ?? `Extract: Block ${current}/${total}`);
       });
 
       this.reportProgress(blocks.length, blocks.length, `Detected ${characters.length} character(s)`);
