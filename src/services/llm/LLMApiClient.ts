@@ -32,10 +32,26 @@ export class LLMApiClient {
   constructor(options: LLMApiClientOptions) {
     this.options = options;
     this.logger = options.logger;
+
+    // Custom fetch that strips SDK headers (some proxies block them)
+    const customFetch: typeof fetch = async (url, init) => {
+      const headers = new Headers();
+      headers.set('Content-Type', 'application/json');
+      if (init?.headers) {
+        const h = new Headers(init.headers);
+        const auth = h.get('Authorization');
+        if (auth) headers.set('Authorization', auth);
+      }
+      return fetch(url, { ...init, headers });
+    };
+
     this.client = new OpenAI({
       apiKey: options.apiKey,
       baseURL: options.apiUrl,
       dangerouslyAllowBrowser: true,
+      maxRetries: 0, // We handle retries ourselves
+      timeout: 180000, // 3 minute timeout
+      fetch: customFetch,
     });
   }
 
