@@ -235,7 +235,7 @@ export class LLMApiClient {
 
     // Assign pass uses line-based format (index:CODE), not JSON
     if (pass === 'assign') {
-      return content.trim();
+      return this.stripThinkingTags(content).trim();
     }
 
     // Extract JSON from response (handle markdown code blocks)
@@ -243,13 +243,20 @@ export class LLMApiClient {
   }
 
   /**
+   * Strip thinking tags from LLM response (used by DeepSeek, Qwen, etc.)
+   */
+  private stripThinkingTags(content: string): string {
+    return content
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+  }
+
+  /**
    * Extract JSON from response (handles markdown code blocks and thinking tags)
    * Uses jsonrepair to fix common LLM JSON issues (trailing commas, missing quotes, etc.)
    */
   private extractJSON(content: string): string {
-    // Remove thinking tags (used by some LLMs like DeepSeek)
-    let cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
-    cleaned = cleaned.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+    const cleaned = this.stripThinkingTags(content);
 
     let jsonCandidate: string;
 
