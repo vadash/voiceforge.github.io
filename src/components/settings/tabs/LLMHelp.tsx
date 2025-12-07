@@ -8,9 +8,7 @@ export function LLMHelp() {
 
   useEffect(() => {
     if (expanded && !content) {
-      const isProd = window.location.pathname.startsWith('/EdgeTTS');
-      const basePath = isProd ? '/EdgeTTS/' : '/';
-      fetch(`${basePath}llm-help.md`)
+      fetch('./llm-help.md')
         .then((res) => {
           if (!res.ok) throw new Error('Failed to load');
           return res.text();
