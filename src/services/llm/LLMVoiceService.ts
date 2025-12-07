@@ -146,9 +146,15 @@ export class LLMVoiceService {
       }
 
       const batch = blocks.slice(i, i + MAX_CONCURRENT);
-      const batchPromises = batch.map((block) =>
-        this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName)
-      );
+      const batchPromises = batch.map((block, batchIndex) => {
+        const blockNum = i + batchIndex + 1;
+        this.logger?.info(`[assign] Starting block ${blockNum}/${blocks.length}`);
+        return this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName)
+          .then(result => {
+            this.logger?.info(`[assign] Completed block ${blockNum}/${blocks.length}`);
+            return result;
+          });
+      });
 
       const batchResults = await Promise.all(batchPromises);
 

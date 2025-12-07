@@ -16,10 +16,13 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 ### Core Flow
 
 1. **File Input** → `FileConverter` parses TXT/FB2/EPUB/ZIP files
-2. **Pipeline** → `ConversionOrchestrator` runs 7 discrete pipeline steps:
-   - Character Extraction (LLM Pass 1)
+2. **Pipeline** → `ConversionOrchestrator` runs 10 discrete pipeline steps:
+   - Extract (LLM character detection)
+   - Merge (LLM character deduplication)
    - Voice Assignment
-   - Speaker Assignment (LLM Pass 2)
+   - Voice Remapping
+   - Assign (LLM speaker assignment)   
+   - Text Sanitization
    - Dictionary Processing
    - TTS Conversion (parallel WebSocket connections)
    - Audio Merge
