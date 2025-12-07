@@ -3,9 +3,20 @@ import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { testConfig } from '../../test.config.local';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import type { TestFixture, ExpectedDialogue } from './fixtures';
+import type { ILogger } from '@/services/interfaces';
 import { speakerMatchesCharacter } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
+
+/**
+ * Console logger for tests
+ */
+const testLogger: ILogger = {
+  debug: (message: string, data?: Record<string, unknown>) => console.log(`[DEBUG] ${message}`, data || ''),
+  info: (message: string, data?: Record<string, unknown>) => console.log(`[INFO] ${message}`, data || ''),
+  warn: (message: string, data?: Record<string, unknown>) => console.warn(`[WARN] ${message}`, data || ''),
+  error: (message: string, error?: Error, data?: Record<string, unknown>) => console.error(`[ERROR] ${message}`, error, data || ''),
+};
 
 /**
  * Test helpers for LLM real API tests
@@ -54,6 +65,7 @@ export function createService(): LLMVoiceService {
     model: testConfig.model,
     narratorVoice: 'en-US-AriaNeural',
     reasoning: testConfig.reasoning ?? undefined,
+    logger: testLogger,
   });
 }
 
