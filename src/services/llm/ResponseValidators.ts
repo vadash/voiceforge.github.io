@@ -36,9 +36,13 @@ export function validateExtractResponse(response: string): LLMValidationResult {
   return { valid: errors.length === 0, errors };
 }
 
+// Maximum number of missing characters to tolerate before failing validation
+const MAX_MISSING_CHARACTERS_TOLERANCE = 3;
+
 /**
  * Validate Merge response (character deduplication)
  * Uses fuzzy matching: accepts variations as valid keep/absorb values
+ * Tolerates up to MAX_MISSING_CHARACTERS_TOLERANCE missing characters (they'll be auto-added)
  */
 export function validateMergeResponse(response: string, characters: LLMCharacter[]): LLMValidationResult {
   const errors: string[] = [];
@@ -120,17 +124,77 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
       }
     }
 
-    // Check all characters are accounted for
+    // Check all characters are accounted for - tolerate small number of missing
+    const missingCharacters: string[] = [];
     for (const char of characters) {
       if (!usedNames.has(char.canonicalName)) {
-        errors.push(`Character "${char.canonicalName}" not found in merges or unchanged`);
+        missingCharacters.push(char.canonicalName);
       }
     }
+
+    // Only fail if too many characters are missing
+    if (missingCharacters.length > MAX_MISSING_CHARACTERS_TOLERANCE) {
+      for (const name of missingCharacters) {
+        errors.push(`Character "${name}" not found in merges or unchanged`);
+      }
+    }
+    // If within tolerance, these will be auto-added by fixMergeResponse
   } catch (e) {
     errors.push(`Invalid JSON: ${(e as Error).message}`);
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Fix merge response by auto-adding missing characters to unchanged list
+ * Call this after validation passes to ensure all characters are accounted for
+ */
+export function fixMergeResponse(response: string, characters: LLMCharacter[]): string {
+  try {
+    const parsed = JSON.parse(response) as MergeResponse;
+    const validNames = new Set(characters.map((c) => c.canonicalName));
+
+    // Build variation -> canonicalName map
+    const variationToCanonical = new Map<string, string>();
+    for (const c of characters) {
+      variationToCanonical.set(c.canonicalName.toLowerCase(), c.canonicalName);
+      for (const v of c.variations) {
+        variationToCanonical.set(v.toLowerCase(), c.canonicalName);
+      }
+    }
+
+    const resolveName = (name: string): string | null => {
+      if (validNames.has(name)) return name;
+      return variationToCanonical.get(name.toLowerCase()) ?? null;
+    };
+
+    // Find all used names
+    const usedNames = new Set<string>();
+    for (const merge of parsed.merges) {
+      const keepResolved = resolveName(merge.keep);
+      if (keepResolved) usedNames.add(keepResolved);
+      for (const name of merge.absorb) {
+        const resolved = resolveName(name);
+        if (resolved) usedNames.add(resolved);
+      }
+    }
+    for (const name of parsed.unchanged) {
+      const resolved = resolveName(name);
+      if (resolved) usedNames.add(resolved);
+    }
+
+    // Auto-add missing characters to unchanged
+    for (const char of characters) {
+      if (!usedNames.has(char.canonicalName)) {
+        parsed.unchanged.push(char.canonicalName);
+      }
+    }
+
+    return JSON.stringify(parsed);
+  } catch {
+    return response; // Return original if parsing fails
+  }
 }
 
 /**

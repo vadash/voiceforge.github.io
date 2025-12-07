@@ -8,7 +8,7 @@ import type {
 import type { ILogger, ProgressCallback } from '../interfaces';
 import { LLMApiClient } from './LLMApiClient';
 import { buildExtractPrompt, buildMergePrompt, buildAssignPrompt } from './PromptBuilders';
-import { validateExtractResponse, validateMergeResponse, validateAssignResponse, parseAssignResponse } from './ResponseValidators';
+import { validateExtractResponse, validateMergeResponse, validateAssignResponse, parseAssignResponse, fixMergeResponse } from './ResponseValidators';
 import { buildCodeMapping, mergeCharacters, applyMergeResponse, normalizeCanonicalNames } from './CharacterUtils';
 
 /**
@@ -250,7 +250,9 @@ export class LLMVoiceService {
       }
     );
 
-    const parsed = JSON.parse(response) as MergeResponse;
+    // Fix response by auto-adding any missing characters to unchanged list
+    const fixedResponse = fixMergeResponse(response, characters);
+    const parsed = JSON.parse(fixedResponse) as MergeResponse;
     return applyMergeResponse(characters, parsed);
   }
 

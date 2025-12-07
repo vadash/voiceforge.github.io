@@ -429,8 +429,19 @@ Before outputting, verify:
 □ "absorb" values exactly match input character names
 □ "variations" includes all names from merged entries
 □ "unchanged" lists characters with no duplicates
-□ All input characters appear in either merges OR unchanged
+□ **CRITICAL: ALL input characters MUST appear in either merges OR unchanged - DO NOT OMIT ANY CHARACTER!**
 □ Output is valid JSON only
+
+<critical_warning>
+**EVERY SINGLE CHARACTER FROM THE INPUT MUST BE ACCOUNTED FOR!**
+
+Count the input characters. Count your output (merges + unchanged). They MUST be equal!
+
+If a character has no duplicates and shouldn't be merged → put them in "unchanged"
+If a character should be merged → put them in a "merges" entry (keep or absorb)
+
+MISSING CHARACTERS = VALIDATION FAILURE = RETRY
+</critical_warning>
 `,
     userTemplate: `<character_list>
 {{characters}}
