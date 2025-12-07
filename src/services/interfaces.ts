@@ -57,8 +57,9 @@ export interface PoolTask {
 export interface WorkerPoolOptions {
   maxWorkers: number;
   config: TTSConfig;
+  directoryHandle?: FileSystemDirectoryHandle | null;
   onStatusUpdate?: (update: StatusUpdate) => void;
-  onTaskComplete?: (partIndex: number, audioData: Uint8Array) => void;
+  onTaskComplete?: (partIndex: number, filename: string) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
   onAllComplete?: () => void;
 }
@@ -80,14 +81,18 @@ export interface IWorkerPool {
   addTask(task: PoolTask): void;
   /** Add multiple tasks to the queue */
   addTasks(tasks: PoolTask[]): void;
-  /** Get all completed audio data */
-  getCompletedAudio(): Map<number, Uint8Array>;
+  /** Get all completed audio filenames (index -> temp filename) */
+  getCompletedAudio(): Map<number, string>;
   /** Get set of failed task indices */
   getFailedTasks(): Set<number>;
   /** Get current progress */
   getProgress(): WorkerPoolProgress;
+  /** Get temp directory handle */
+  getTempDirHandle(): FileSystemDirectoryHandle | null;
   /** Clear all state and stop processing */
   clear(): void;
+  /** Cleanup temp directory */
+  cleanup(): Promise<void>;
 }
 
 // ============================================================================
@@ -136,16 +141,18 @@ export type MergeProgressCallback = (current: number, total: number, message: st
 export interface IAudioMerger {
   /** Calculate how to group audio chunks for merging */
   calculateMergeGroups(
-    audioMap: Map<number, Uint8Array>,
+    audioMap: Map<number, string>,
     totalSentences: number,
-    fileNames: Array<[string, number]>
-  ): MergeGroup[];
+    fileNames: Array<[string, number]>,
+    tempDirHandle: FileSystemDirectoryHandle
+  ): Promise<MergeGroup[]>;
 
   /** Merge audio chunks according to groups */
   merge(
-    audioMap: Map<number, Uint8Array>,
+    audioMap: Map<number, string>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
+    tempDirHandle: FileSystemDirectoryHandle,
     onProgress?: MergeProgressCallback
   ): Promise<MergedFile[]>;
 

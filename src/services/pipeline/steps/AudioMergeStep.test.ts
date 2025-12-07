@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AudioMergeStep, createAudioMergeStep } from './AudioMergeStep';
-import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress, createContextWithAudio } from '@/test/pipeline/helpers';
+import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress, createContextWithAudio, createMockDirectoryHandle } from '@/test/pipeline/helpers';
 import { createMockFFmpegService } from '@/test/mocks/MockFFmpegService';
 import type { IAudioMerger, MergerConfig, MergedFile, IFFmpegService } from '@/services/interfaces';
 
@@ -10,18 +10,19 @@ describe('AudioMergeStep', () => {
   let mockAudioMerger: IAudioMerger;
   let capturedConfig: MergerConfig | undefined;
 
-  const testAudioMap = new Map<number, Uint8Array>([
-    [0, new Uint8Array([1, 2, 3])],
-    [1, new Uint8Array([4, 5, 6])],
-    [2, new Uint8Array([7, 8, 9])],
+  // Disk-based audio map: index -> temp filename
+  const testAudioMap = new Map<number, string>([
+    [0, 'chunk_000000.bin'],
+    [1, 'chunk_000001.bin'],
+    [2, 'chunk_000002.bin'],
   ]);
 
   const testMergedFiles: MergedFile[] = [
-    { filename: 'output_001.mp3', data: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]) },
+    { filename: 'output_001.mp3', blob: new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9])]), fromIndex: 0, toIndex: 2 },
   ];
 
   const createMockMerger = (files: MergedFile[]): IAudioMerger => ({
-    calculateMergeGroups: vi.fn(() => [[0, 1, 2]]),
+    calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'test', mergeNumber: 1, durationMs: 1000 }]),
     merge: vi.fn(async () => files),
     saveMergedFiles: vi.fn(async () => {}),
   });
@@ -37,6 +38,7 @@ describe('AudioMergeStep', () => {
       outputFormat: 'mp3',
       silenceRemoval: false,
       normalization: false,
+      deEss: false,
       ffmpegService: mockFFmpegService,
       createAudioMerger: (config) => {
         capturedConfig = config;
@@ -73,10 +75,11 @@ describe('AudioMergeStep', () => {
       await step.execute(context, createNeverAbortSignal());
 
       expect(mockAudioMerger.merge).toHaveBeenCalled();
-      const [audioMap, totalChunks, fileNames] = (mockAudioMerger.merge as any).mock.calls[0];
+      const [audioMap, totalChunks, fileNames, tempDirHandle] = (mockAudioMerger.merge as any).mock.calls[0];
       expect(audioMap.size).toBe(3);
       expect(totalChunks).toBe(3);
       expect(fileNames).toEqual([['chapter1', 0]]);
+      expect(tempDirHandle).toBeDefined();
     });
 
     it('preserves existing context properties', async () => {
@@ -106,6 +109,7 @@ describe('AudioMergeStep', () => {
         outputFormat: 'opus',
         silenceRemoval: false,
         normalization: false,
+        deEss: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -127,6 +131,7 @@ describe('AudioMergeStep', () => {
         outputFormat: 'opus',
         silenceRemoval: false,
         normalization: false,
+        deEss: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -154,6 +159,7 @@ describe('AudioMergeStep', () => {
         outputFormat: 'mp3',
         silenceRemoval: true,
         normalization: false,
+        deEss: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -172,6 +178,7 @@ describe('AudioMergeStep', () => {
         outputFormat: 'mp3',
         silenceRemoval: false,
         normalization: true,
+        deEss: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -215,6 +222,7 @@ describe('AudioMergeStep', () => {
         outputFormat: 'opus',
         silenceRemoval: false,
         normalization: false,
+        deEss: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: () => mockAudioMerger,
       });
@@ -256,6 +264,7 @@ describe('AudioMergeStep', () => {
         outputFormat: 'opus',
         silenceRemoval: false,
         normalization: false,
+        deEss: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: () => mockAudioMerger,
       });

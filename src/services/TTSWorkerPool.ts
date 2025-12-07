@@ -1,5 +1,6 @@
 // TTSWorkerPool - Worker pool using reusable WebSocket connections
 // Uses TTSConnectionPool internally for connection management
+// Writes audio chunks to disk immediately to prevent OOM
 
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
 import { defaultConfig, getRetryDelay, type TTSConfig } from '@/config';
@@ -12,8 +13,9 @@ export interface WorkerPoolOptions {
   maxWorkers: number;
   config: VoiceConfig;
   ttsConfig?: TTSConfig;
+  directoryHandle?: FileSystemDirectoryHandle | null;
   onStatusUpdate?: (update: StatusUpdate) => void;
-  onTaskComplete?: (partIndex: number, audioData: Uint8Array) => void;
+  onTaskComplete?: (partIndex: number, filename: string) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
   onAllComplete?: () => void;
   logger?: ILogger;
@@ -23,30 +25,36 @@ interface QueuedTask extends PoolTask {
   retryCount: number;
 }
 
+const TEMP_DIR_NAME = '_temp_work';
+
 /**
  * TTSWorkerPool - Uses reusable WebSocket connections
  *
  * Features:
  * - Uses TTSConnectionPool for connection management
  * - Reuses WebSocket connections across multiple requests
+ * - Writes audio chunks to disk immediately to prevent OOM
  * - Reduces rate-limiting by avoiding frequent new connections
  */
 export class TTSWorkerPool implements IWorkerPool {
   private connectionPool: TTSConnectionPool;
   private queue: QueuedTask[] = [];
   private activeTasks: Map<number, QueuedTask> = new Map();
-  private completedAudio: Map<number, Uint8Array> = new Map();
+  private completedAudio: Map<number, string> = new Map();
   private failedTasks: Set<number> = new Set();
   private totalTasks = 0;
   private completedCount = 0;
   private isProcessingQueue = false;
   private lastErrorTime = 0;
+  private tempDirHandle: FileSystemDirectoryHandle | null = null;
+  private directoryHandle: FileSystemDirectoryHandle | null = null;
+  private initPromise: Promise<void> | null = null;
 
   private maxWorkers: number;
   private voiceConfig: VoiceConfig;
   private ttsConfig: TTSConfig;
   private onStatusUpdate?: (update: StatusUpdate) => void;
-  private onTaskComplete?: (partIndex: number, audioData: Uint8Array) => void;
+  private onTaskComplete?: (partIndex: number, filename: string) => void;
   private onTaskError?: (partIndex: number, error: Error) => void;
   private onAllComplete?: () => void;
   private logger?: ILogger;
@@ -55,6 +63,7 @@ export class TTSWorkerPool implements IWorkerPool {
     this.maxWorkers = options.maxWorkers;
     this.voiceConfig = options.config;
     this.ttsConfig = options.ttsConfig ?? defaultConfig.tts;
+    this.directoryHandle = options.directoryHandle ?? null;
     this.onStatusUpdate = options.onStatusUpdate;
     this.onTaskComplete = options.onTaskComplete;
     this.onTaskError = options.onTaskError;
@@ -65,6 +74,46 @@ export class TTSWorkerPool implements IWorkerPool {
       maxConnections: this.maxWorkers,
       logger: this.logger,
     });
+
+    // Initialize temp directory asynchronously
+    this.initPromise = this.initTempDirectory();
+  }
+
+  /**
+   * Initialize the temp directory for storing audio chunks
+   */
+  private async initTempDirectory(): Promise<void> {
+    if (!this.directoryHandle) {
+      throw new Error('Directory handle required for disk-based audio storage');
+    }
+
+    try {
+      this.tempDirHandle = await this.directoryHandle.getDirectoryHandle(TEMP_DIR_NAME, { create: true });
+      this.logger?.debug(`Created temp directory: ${TEMP_DIR_NAME}`);
+    } catch (err) {
+      this.logger?.error(`Failed to create temp directory: ${(err as Error).message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * Write audio chunk to disk
+   */
+  private async writeChunkToDisk(partIndex: number, audioData: Uint8Array): Promise<string> {
+    if (!this.tempDirHandle) {
+      throw new Error('Temp directory not initialized');
+    }
+
+    const filename = `chunk_${String(partIndex).padStart(6, '0')}.bin`;
+    const fileHandle = await this.tempDirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    // Create a new ArrayBuffer copy to avoid SharedArrayBuffer issues
+    const buffer = new ArrayBuffer(audioData.byteLength);
+    new Uint8Array(buffer).set(audioData);
+    await writable.write(buffer);
+    await writable.close();
+
+    return filename;
   }
 
   /**
@@ -91,6 +140,12 @@ export class TTSWorkerPool implements IWorkerPool {
   private async processQueue(): Promise<void> {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
+
+    // Wait for temp directory initialization
+    if (this.initPromise) {
+      await this.initPromise;
+      this.initPromise = null;
+    }
 
     while (this.activeTasks.size < this.maxWorkers && this.queue.length > 0) {
       // Check error cooldown
@@ -128,15 +183,17 @@ export class TTSWorkerPool implements IWorkerPool {
         requestId: generateConnectionId(),
       });
 
-      this.handleTaskComplete(task.partIndex, audioData);
+      // Write to disk immediately
+      const filename = await this.writeChunkToDisk(task.partIndex, audioData);
+      this.handleTaskComplete(task.partIndex, filename);
     } catch (error) {
       this.handleTaskError(task.partIndex, error as Error, task.retryCount);
     }
   }
 
-  private handleTaskComplete(partIndex: number, audioData: Uint8Array): void {
+  private handleTaskComplete(partIndex: number, filename: string): void {
     this.activeTasks.delete(partIndex);
-    this.completedAudio.set(partIndex, audioData);
+    this.completedAudio.set(partIndex, filename);
     this.completedCount++;
 
     this.onStatusUpdate?.({
@@ -145,7 +202,7 @@ export class TTSWorkerPool implements IWorkerPool {
       isComplete: true,
     });
 
-    this.onTaskComplete?.(partIndex, audioData);
+    this.onTaskComplete?.(partIndex, filename);
     this.checkCompletion();
     this.processQueue();
   }
@@ -202,7 +259,7 @@ export class TTSWorkerPool implements IWorkerPool {
     }
   }
 
-  getCompletedAudio(): Map<number, Uint8Array> {
+  getCompletedAudio(): Map<number, string> {
     return new Map(this.completedAudio);
   }
 
@@ -218,11 +275,30 @@ export class TTSWorkerPool implements IWorkerPool {
     };
   }
 
+  getTempDirHandle(): FileSystemDirectoryHandle | null {
+    return this.tempDirHandle;
+  }
+
   /**
    * Get connection pool statistics
    */
   getPoolStats(): { total: number; ready: number; busy: number; disconnected: number } {
     return this.connectionPool.getStats();
+  }
+
+  /**
+   * Cleanup temp directory and remove all temp files
+   */
+  async cleanup(): Promise<void> {
+    if (this.directoryHandle && this.tempDirHandle) {
+      try {
+        await this.directoryHandle.removeEntry(TEMP_DIR_NAME, { recursive: true });
+        this.logger?.debug(`Cleaned up temp directory: ${TEMP_DIR_NAME}`);
+      } catch (err) {
+        this.logger?.warn(`Failed to cleanup temp directory: ${(err as Error).message}`);
+      }
+      this.tempDirHandle = null;
+    }
   }
 
   clear(): void {

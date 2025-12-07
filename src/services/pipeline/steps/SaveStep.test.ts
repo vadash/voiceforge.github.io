@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SaveStep, createSaveStep } from './SaveStep';
-import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress } from '@/test/pipeline/helpers';
+import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress, createMockDirectoryHandle } from '@/test/pipeline/helpers';
 import type { IAudioMerger, MergerConfig, MergedFile } from '@/services/interfaces';
 
 describe('SaveStep', () => {
@@ -8,12 +8,12 @@ describe('SaveStep', () => {
   let mockAudioMerger: IAudioMerger;
 
   const testMergedFiles: MergedFile[] = [
-    { filename: 'output_001.mp3', data: new Uint8Array([1, 2, 3]) },
-    { filename: 'output_002.mp3', data: new Uint8Array([4, 5, 6]) },
+    { filename: 'output_001.mp3', blob: new Blob([new Uint8Array([1, 2, 3])]), fromIndex: 0, toIndex: 0 },
+    { filename: 'output_002.mp3', blob: new Blob([new Uint8Array([4, 5, 6])]), fromIndex: 1, toIndex: 1 },
   ];
 
   const createMockMerger = (): IAudioMerger => ({
-    calculateMergeGroups: vi.fn(() => []),
+    calculateMergeGroups: vi.fn(async () => []),
     merge: vi.fn(async () => []),
     saveMergedFiles: vi.fn(async () => {}),
   });
@@ -40,11 +40,12 @@ describe('SaveStep', () => {
 
       await step.execute(context, createNeverAbortSignal());
 
-      expect(mockAudioMerger.saveMergedFiles).toHaveBeenCalledWith(testMergedFiles, undefined);
+      // directoryHandle is now provided by default in createTestContext
+      expect(mockAudioMerger.saveMergedFiles).toHaveBeenCalledWith(testMergedFiles, expect.anything());
     });
 
     it('saves to directory handle when provided', async () => {
-      const mockHandle = {} as FileSystemDirectoryHandle;
+      const mockHandle = createMockDirectoryHandle();
       const context = createTestContext({
         mergedFiles: testMergedFiles,
         directoryHandle: mockHandle,
@@ -59,7 +60,7 @@ describe('SaveStep', () => {
       const context = createTestContext({
         text: 'Original text.',
         mergedFiles: testMergedFiles,
-        audioMap: new Map([[0, new Uint8Array([1])]]),
+        audioMap: new Map([[0, 'chunk_000000.bin']]),
       });
 
       const result = await step.execute(context, createNeverAbortSignal());

@@ -1,5 +1,6 @@
 // Audio Merge Step
 // Merges audio chunks into files
+// Reads chunks from disk to prevent OOM
 
 import { BasePipelineStep, PipelineContext } from '../types';
 import type { IAudioMerger, MergerConfig, IFFmpegService } from '@/services/interfaces';
@@ -19,10 +20,11 @@ export interface AudioMergeStepOptions {
 /**
  * Merges audio chunks into files
  * Handles FFmpeg loading for Opus encoding
+ * Reads audio chunks from disk to minimize RAM usage
  */
 export class AudioMergeStep extends BasePipelineStep {
   readonly name = 'audio-merge';
-  protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['audioMap', 'tempDirHandle'];
 
   constructor(private options: AudioMergeStepOptions) {
     super();
@@ -31,7 +33,7 @@ export class AudioMergeStep extends BasePipelineStep {
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
 
-    const { audioMap, assignments, fileNames } = context;
+    const { audioMap, tempDirHandle, assignments, fileNames } = context;
 
     if (!audioMap || audioMap.size === 0) {
       this.reportProgress(1, 1, 'No audio to merge');
@@ -39,6 +41,10 @@ export class AudioMergeStep extends BasePipelineStep {
         ...context,
         mergedFiles: [],
       };
+    }
+
+    if (!tempDirHandle) {
+      throw new Error('Temp directory handle required for disk-based audio merging');
     }
 
     // Determine output format
@@ -73,11 +79,12 @@ export class AudioMergeStep extends BasePipelineStep {
 
     this.reportProgress(0, totalChunks, 'Merging audio...');
 
-    // Merge audio
+    // Merge audio - reads from disk
     const mergedFiles = await merger.merge(
       audioMap,
       totalChunks,
       fileNames,
+      tempDirHandle,
       (current, total, message) => {
         this.reportProgress(current, total, message);
       }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
 import type { PoolTask } from './interfaces';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '@/state/types';
+import { createMockDirectoryHandle } from '@/test/pipeline/helpers';
 
 // Mock the TTSConnectionPool
 vi.mock('./TTSConnectionPool', () => {
@@ -24,10 +25,14 @@ describe('TTSWorkerPool', () => {
   let defaultOptions: WorkerPoolOptions;
   let defaultVoiceConfig: VoiceConfig;
   let mockExecute: ReturnType<typeof vi.fn>;
+  let mockDirectoryHandle: FileSystemDirectoryHandle;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+
+    // Create mock directory handle
+    mockDirectoryHandle = createMockDirectoryHandle();
 
     // Get a fresh mock execute function for each test
     mockExecute = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
@@ -48,6 +53,7 @@ describe('TTSWorkerPool', () => {
     defaultOptions = {
       maxWorkers: 3,
       config: defaultVoiceConfig,
+      directoryHandle: mockDirectoryHandle,
       ttsConfig: {
         maxRetries: 3,
         baseRetryDelay: 100,
@@ -127,7 +133,7 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('task completion', () => {
-    it('stores completed audio', async () => {
+    it('stores completed audio as filename', async () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
@@ -135,17 +141,19 @@ describe('TTSWorkerPool', () => {
 
       const completedAudio = pool.getCompletedAudio();
       expect(completedAudio.size).toBe(1);
-      expect(completedAudio.get(0)).toEqual(new Uint8Array([1, 2, 3]));
+      // Now stores filename instead of Uint8Array
+      expect(completedAudio.get(0)).toMatch(/^chunk_\d+\.bin$/);
     });
 
-    it('calls onTaskComplete callback', async () => {
+    it('calls onTaskComplete callback with filename', async () => {
       const onTaskComplete = vi.fn();
       pool = createPool({ onTaskComplete });
       pool.addTask(createTask(0));
 
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(onTaskComplete).toHaveBeenCalledWith(0, expect.any(Uint8Array));
+      // Now receives filename instead of Uint8Array
+      expect(onTaskComplete).toHaveBeenCalledWith(0, expect.stringMatching(/^chunk_\d+\.bin$/));
     });
 
     it('calls onAllComplete when all tasks done', async () => {
@@ -379,6 +387,30 @@ describe('TTSWorkerPool', () => {
       const failed2 = pool.getFailedTasks();
 
       expect(failed1).not.toBe(failed2);
+    });
+  });
+
+  describe('getTempDirHandle', () => {
+    it('returns temp directory handle after initialization', async () => {
+      pool = createPool();
+      pool.addTask(createTask(0));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(pool.getTempDirHandle()).toBeDefined();
+    });
+  });
+
+  describe('cleanup', () => {
+    it('removes temp directory', async () => {
+      pool = createPool();
+      pool.addTask(createTask(0));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await pool.cleanup();
+
+      expect(pool.getTempDirHandle()).toBeNull();
     });
   });
 

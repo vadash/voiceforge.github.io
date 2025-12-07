@@ -44,7 +44,8 @@ export interface ContextWithAssignments extends ContextWithVoiceMap {
  * Context with audio (after TTSConversionStep)
  */
 export interface ContextWithAudio extends ContextWithAssignments {
-  audioMap: Map<number, Uint8Array>;
+  audioMap: Map<number, string>;
+  tempDirHandle: FileSystemDirectoryHandle;
   failedTasks: Set<number>;
 }
 
@@ -83,8 +84,8 @@ export function hasAssignments(ctx: PipelineContext): ctx is PipelineContext & {
 /**
  * Check if context has audio
  */
-export function hasAudio(ctx: PipelineContext): ctx is PipelineContext & { audioMap: Map<number, Uint8Array> } {
-  return ctx.audioMap instanceof Map;
+export function hasAudio(ctx: PipelineContext): ctx is PipelineContext & { audioMap: Map<number, string>; tempDirHandle: FileSystemDirectoryHandle } {
+  return ctx.audioMap instanceof Map && ctx.tempDirHandle !== undefined;
 }
 
 /**
@@ -118,8 +119,9 @@ export interface PipelineContext {
   // LLM Assign output
   assignments?: SpeakerAssignment[];
 
-  // TTS output
-  audioMap?: Map<number, Uint8Array>;
+  // TTS output (disk-based: index -> temp filename)
+  audioMap?: Map<number, string>;
+  tempDirHandle?: FileSystemDirectoryHandle;
   failedTasks?: Set<number>;
 
   // Merge output

@@ -1,4 +1,5 @@
 // AudioMerger - Handles audio merging with duration-based grouping and FFmpeg processing
+// Reads audio chunks from disk to prevent OOM
 // Supports Opus encoding with silence removal and normalization
 
 import { defaultConfig } from '@/config';
@@ -29,6 +30,7 @@ export interface MergerConfig {
 
 /**
  * AudioMerger - Implements IAudioMerger interface
+ * Reads audio chunks from disk to minimize RAM usage
  * Receives IFFmpegService via constructor for testability
  */
 export class AudioMerger implements IAudioMerger {
@@ -72,13 +74,40 @@ export class AudioMerger implements IAudioMerger {
   }
 
   /**
-   * Calculate merge groups based on duration and file boundaries
+   * Read a chunk file from disk
    */
-  calculateMergeGroups(
-    audioMap: Map<number, Uint8Array>,
+  private async readChunkFromDisk(
+    filename: string,
+    tempDirHandle: FileSystemDirectoryHandle
+  ): Promise<Uint8Array> {
+    const fileHandle = await tempDirHandle.getFileHandle(filename);
+    const file = await fileHandle.getFile();
+    const arrayBuffer = await file.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  }
+
+  /**
+   * Get file size from disk without reading the entire file
+   */
+  private async getFileSize(
+    filename: string,
+    tempDirHandle: FileSystemDirectoryHandle
+  ): Promise<number> {
+    const fileHandle = await tempDirHandle.getFileHandle(filename);
+    const file = await fileHandle.getFile();
+    return file.size;
+  }
+
+  /**
+   * Calculate merge groups based on duration and file boundaries
+   * Reads file sizes from disk to estimate durations
+   */
+  async calculateMergeGroups(
+    audioMap: Map<number, string>,
     totalSentences: number,
-    fileNames: Array<[string, number]>
-  ): MergeGroup[] {
+    fileNames: Array<[string, number]>,
+    tempDirHandle: FileSystemDirectoryHandle
+  ): Promise<MergeGroup[]> {
     const groups: MergeGroup[] = [];
 
     if (totalSentences === 0) return groups;
@@ -111,8 +140,13 @@ export class AudioMerger implements IAudioMerger {
       const isFileBoundary = currentFile !== lastFilename;
       const isLastItem = i === totalSentences - 1;
 
-      const chunkBytes = audioMap.get(i)?.length ?? 0;
-      const chunkDurationMs = this.estimateDurationMs(chunkBytes);
+      // Get file size from disk
+      const chunkFilename = audioMap.get(i);
+      let chunkDurationMs = 0;
+      if (chunkFilename) {
+        const fileSize = await this.getFileSize(chunkFilename, tempDirHandle);
+        chunkDurationMs = this.estimateDurationMs(fileSize);
+      }
 
       // Check if adding this chunk would exceed max duration
       const wouldExceedMax = groupDurationMs + chunkDurationMs > this.maxDurationMs;
@@ -155,18 +189,22 @@ export class AudioMerger implements IAudioMerger {
 
   /**
    * Merge audio data for a group (sync, MP3 only)
+   * Reads chunks from disk one by one
    */
-  private mergeAudioGroupSync(
-    audioMap: Map<number, Uint8Array>,
+  private async mergeAudioGroupSync(
+    audioMap: Map<number, string>,
     group: MergeGroup,
-    totalGroups: number
-  ): MergedFile | null {
+    totalGroups: number,
+    tempDirHandle: FileSystemDirectoryHandle
+  ): Promise<MergedFile | null> {
     let totalSize = 0;
     const chunks: Uint8Array[] = [];
 
+    // Read chunks one by one from disk
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
-      const audio = audioMap.get(i);
-      if (audio) {
+      const chunkFilename = audioMap.get(i);
+      if (chunkFilename) {
+        const audio = await this.readChunkFromDisk(chunkFilename, tempDirHandle);
         totalSize += audio.length;
         chunks.push(audio);
       }
@@ -194,18 +232,22 @@ export class AudioMerger implements IAudioMerger {
 
   /**
    * Merge audio data for a group with FFmpeg processing (async)
+   * Reads chunks from disk one by one to minimize memory
    */
   private async mergeAudioGroupAsync(
-    audioMap: Map<number, Uint8Array>,
+    audioMap: Map<number, string>,
     group: MergeGroup,
     totalGroups: number,
+    tempDirHandle: FileSystemDirectoryHandle,
     onProgress?: (message: string) => void
   ): Promise<MergedFile | null> {
     const chunks: Uint8Array[] = [];
 
+    // Read chunks one by one from disk
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
-      const audio = audioMap.get(i);
-      if (audio) {
+      const chunkFilename = audioMap.get(i);
+      if (chunkFilename) {
+        const audio = await this.readChunkFromDisk(chunkFilename, tempDirHandle);
         chunks.push(audio);
       }
     }
@@ -243,7 +285,7 @@ export class AudioMerger implements IAudioMerger {
     }
 
     // MP3 fallback - simple concatenation
-    return this.mergeAudioGroupSync(audioMap, group, totalGroups);
+    return this.mergeAudioGroupSync(audioMap, group, totalGroups, tempDirHandle);
   }
 
   private generateFilename(group: MergeGroup, totalGroups: number, extension: string): string {
@@ -260,14 +302,16 @@ export class AudioMerger implements IAudioMerger {
 
   /**
    * Merge all completed audio (async with FFmpeg support)
+   * Reads audio chunks from disk to prevent OOM
    */
   async merge(
-    audioMap: Map<number, Uint8Array>,
+    audioMap: Map<number, string>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
+    tempDirHandle: FileSystemDirectoryHandle,
     onProgress?: (current: number, total: number, message: string) => void
   ): Promise<MergedFile[]> {
-    const groups = this.calculateMergeGroups(audioMap, totalSentences, fileNames);
+    const groups = await this.calculateMergeGroups(audioMap, totalSentences, fileNames, tempDirHandle);
     const results: MergedFile[] = [];
 
     for (let i = 0; i < groups.length; i++) {
@@ -279,6 +323,7 @@ export class AudioMerger implements IAudioMerger {
         audioMap,
         group,
         groups.length,
+        tempDirHandle,
         (msg) => onProgress?.(i + 1, groups.length, msg)
       );
 

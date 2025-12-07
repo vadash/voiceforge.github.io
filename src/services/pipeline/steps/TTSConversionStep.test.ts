@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TTSConversionStep, createTTSConversionStep } from './TTSConversionStep';
-import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress, createContextWithAssignments } from '@/test/pipeline/helpers';
+import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress, createContextWithAssignments, createMockDirectoryHandle } from '@/test/pipeline/helpers';
 import type { IWorkerPool, WorkerPoolOptions, PoolTask, SpeakerAssignment } from '@/services/interfaces';
 
 describe('TTSConversionStep', () => {
@@ -8,6 +8,7 @@ describe('TTSConversionStep', () => {
   let mockWorkerPool: IWorkerPool;
   let capturedOptions: WorkerPoolOptions | undefined;
   let capturedTasks: PoolTask[];
+  let mockTempDirHandle: FileSystemDirectoryHandle;
 
   const testAssignments: SpeakerAssignment[] = [
     { sentenceIndex: 0, text: 'Hello world.', speaker: 'Narrator', voiceId: 'voice-1' },
@@ -16,9 +17,10 @@ describe('TTSConversionStep', () => {
   ];
 
   const createMockWorkerPool = (): IWorkerPool => {
-    const completedAudio = new Map<number, Uint8Array>();
+    const completedAudio = new Map<number, string>();
     const failedTasks = new Set<number>();
     let onAllCompleteCallback: (() => void) | undefined;
+    mockTempDirHandle = createMockDirectoryHandle();
 
     return {
       addTask: vi.fn((task: PoolTask) => {
@@ -29,8 +31,9 @@ describe('TTSConversionStep', () => {
         // Store callback for later and simulate completion
         onAllCompleteCallback = capturedOptions?.onAllComplete;
         tasks.forEach((task, i) => {
-          completedAudio.set(task.partIndex, new Uint8Array([i + 1]));
-          capturedOptions?.onTaskComplete?.(task.partIndex, new Uint8Array([i + 1]));
+          const filename = `chunk_${String(task.partIndex).padStart(6, '0')}.bin`;
+          completedAudio.set(task.partIndex, filename);
+          capturedOptions?.onTaskComplete?.(task.partIndex, filename);
         });
         // Immediately call onAllComplete
         onAllCompleteCallback?.();
@@ -42,11 +45,13 @@ describe('TTSConversionStep', () => {
         total: capturedTasks.length,
         failed: failedTasks.size,
       })),
+      getTempDirHandle: vi.fn(() => mockTempDirHandle),
       clear: vi.fn(() => {
         completedAudio.clear();
         failedTasks.clear();
         capturedTasks = [];
       }),
+      cleanup: vi.fn(async () => {}),
     };
   };
 
@@ -82,6 +87,7 @@ describe('TTSConversionStep', () => {
 
       expect(result.audioMap).toBeDefined();
       expect(result.audioMap!.size).toBe(3);
+      expect(result.tempDirHandle).toBeDefined();
     });
 
     it('creates worker pool with correct options', async () => {
@@ -90,6 +96,7 @@ describe('TTSConversionStep', () => {
 
       expect(capturedOptions).toBeDefined();
       expect(capturedOptions!.maxWorkers).toBe(3);
+      expect(capturedOptions!.directoryHandle).toBeDefined();
     });
 
     it('adds tasks to worker pool', async () => {
@@ -182,6 +189,15 @@ describe('TTSConversionStep', () => {
       await expect(step.execute(context, createNeverAbortSignal()))
         .rejects.toThrow('No pronounceable content');
     });
+
+    it('throws when directoryHandle missing', async () => {
+      const context = createContextWithAssignments(testAssignments, {
+        directoryHandle: null,
+      });
+
+      await expect(step.execute(context, createNeverAbortSignal()))
+        .rejects.toThrow("requires 'directoryHandle'");
+    });
   });
 
   describe('progress reporting', () => {
@@ -223,7 +239,9 @@ describe('TTSConversionStep', () => {
         getCompletedAudio: vi.fn(() => new Map()),
         getFailedTasks: vi.fn(() => new Set()),
         getProgress: vi.fn(() => ({ completed: 0, total: 0, failed: 0 })),
+        getTempDirHandle: vi.fn(() => createMockDirectoryHandle()),
         clear: vi.fn(),
+        cleanup: vi.fn(async () => {}),
       };
 
       const stepWithNeverCompletingPool = createTTSConversionStep({

@@ -6,6 +6,63 @@ import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import type { MergedFile } from '@/services/interfaces';
 
 /**
+ * Create a mock FileSystemDirectoryHandle for testing
+ */
+export function createMockDirectoryHandle(): FileSystemDirectoryHandle {
+  const files = new Map<string, Uint8Array>();
+
+  const mockFileHandle = (name: string): FileSystemFileHandle => ({
+    kind: 'file',
+    name,
+    isSameEntry: async () => false,
+    getFile: async () => {
+      const data = files.get(name) ?? new Uint8Array([]);
+      return new File([data], name, { type: 'audio/mpeg' });
+    },
+    createWritable: async () => ({
+      write: async (data: BufferSource | Blob | string) => {
+        if (data instanceof ArrayBuffer) {
+          files.set(name, new Uint8Array(data));
+        } else if (data instanceof Blob) {
+          const buffer = await data.arrayBuffer();
+          files.set(name, new Uint8Array(buffer));
+        }
+      },
+      close: async () => {},
+      seek: async () => {},
+      truncate: async () => {},
+      abort: async () => {},
+      locked: false,
+      getWriter: () => ({ write: async () => {}, close: async () => {}, abort: async () => {}, closed: Promise.resolve(), desiredSize: 0, ready: Promise.resolve(), releaseLock: () => {} } as unknown as WritableStreamDefaultWriter<unknown>),
+    } as unknown as FileSystemWritableFileStream),
+    queryPermission: async () => 'granted' as PermissionState,
+    requestPermission: async () => 'granted' as PermissionState,
+  } as FileSystemFileHandle);
+
+  const mockDirHandle: FileSystemDirectoryHandle = {
+    kind: 'directory',
+    name: 'test-dir',
+    isSameEntry: async () => false,
+    getDirectoryHandle: async (name: string, options?: { create?: boolean }) => {
+      return createMockDirectoryHandle();
+    },
+    getFileHandle: async (name: string, options?: { create?: boolean }) => {
+      return mockFileHandle(name);
+    },
+    removeEntry: async () => {},
+    resolve: async () => null,
+    keys: async function* () {},
+    values: async function* () {},
+    entries: async function* () {},
+    [Symbol.asyncIterator]: async function* () {},
+    queryPermission: async () => 'granted' as PermissionState,
+    requestPermission: async () => 'granted' as PermissionState,
+  } as FileSystemDirectoryHandle;
+
+  return mockDirHandle;
+}
+
+/**
  * Create a test pipeline context with defaults
  */
 export function createTestContext(overrides: Partial<PipelineContext> = {}): PipelineContext {
@@ -14,6 +71,7 @@ export function createTestContext(overrides: Partial<PipelineContext> = {}): Pip
     fileNames: [['test_file', 0]],
     dictionaryRules: [],
     detectedLanguage: 'en',
+    directoryHandle: createMockDirectoryHandle(),
     ...overrides,
   };
 }
@@ -60,14 +118,15 @@ export function createContextWithAssignments(
 }
 
 /**
- * Create a context with audio map
+ * Create a context with audio map (disk-based: index -> filename)
  */
 export function createContextWithAudio(
-  audioMap: Map<number, Uint8Array>,
+  audioMap: Map<number, string>,
   overrides: Partial<PipelineContext> = {}
 ): PipelineContext {
   return createTestContext({
     audioMap,
+    tempDirHandle: createMockDirectoryHandle(),
     ...overrides,
   });
 }
@@ -126,12 +185,13 @@ export function createMockAssignmentStep(assignments: SpeakerAssignment[]): IPip
 }
 
 /**
- * Create a mock step that adds audio to context
+ * Create a mock step that adds audio to context (disk-based)
  */
-export function createMockAudioStep(audioMap: Map<number, Uint8Array>): IPipelineStep {
+export function createMockAudioStep(audioMap: Map<number, string>): IPipelineStep {
   return createMockStep('mock-audio', async (context) => ({
     ...context,
     audioMap,
+    tempDirHandle: createMockDirectoryHandle(),
     failedTasks: new Set(),
   }));
 }
