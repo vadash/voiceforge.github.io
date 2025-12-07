@@ -243,4 +243,5 @@ Tailwind CSS v3 with custom configuration:
 
 ## CRITICAL
 
-USE bash commands for Windows!
+1. USE bash commands for Windows!
+2. NO FALLBACKS! If you want to add one ask user first.

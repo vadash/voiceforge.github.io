@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { ChatCompletionCreateParamsStreaming, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
+import { jsonrepair } from 'jsonrepair';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay } from '@/config';
 import type { ILogger } from '../interfaces';
@@ -238,25 +239,31 @@ export class LLMApiClient {
 
   /**
    * Extract JSON from response (handles markdown code blocks and thinking tags)
+   * Uses jsonrepair to fix common LLM JSON issues (trailing commas, missing quotes, etc.)
    */
   private extractJSON(content: string): string {
     // Remove thinking tags (used by some LLMs like DeepSeek)
     let cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
     cleaned = cleaned.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
 
+    let jsonCandidate: string;
+
     // Try to extract from markdown code block
     const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
-      return jsonMatch[1].trim();
+      jsonCandidate = jsonMatch[1].trim();
+    } else {
+      // Try to find raw JSON object
+      const objectMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (objectMatch) {
+        jsonCandidate = objectMatch[0];
+      } else {
+        jsonCandidate = cleaned.trim();
+      }
     }
 
-    // Try to find raw JSON object
-    const objectMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (objectMatch) {
-      return objectMatch[0];
-    }
-
-    return cleaned.trim();
+    // Repair common JSON issues (trailing commas, missing quotes, unclosed brackets)
+    return jsonrepair(jsonCandidate);
   }
 
   /**
