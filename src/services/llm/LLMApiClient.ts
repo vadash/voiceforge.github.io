@@ -169,6 +169,7 @@ export class LLMApiClient {
 
     // Make API call - handle both streaming and non-streaming modes
     let content = '';
+    this.logger?.info(`[${pass}] API call starting...`);
     const isStreaming = this.options.streaming !== false;
 
     if (isStreaming) {
@@ -206,6 +207,8 @@ export class LLMApiClient {
       const response = await this.client.chat.completions.create(nonStreamParams, { signal });
       content = response.choices[0]?.message?.content || '';
     }
+
+    this.logger?.info(`[${pass}] API call completed (${content.length} chars)`);
 
     // Build response object for logging
     const data = {
