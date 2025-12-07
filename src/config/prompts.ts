@@ -98,7 +98,15 @@ Look for direct attribution using speech verbs:
 - "I don't know," **he replied** → Speaker = the male character referenced by "he"
 - "Stop right there," **Captain Reynolds commanded** → Speaker = Captain Reynolds
 
-Speech verbs to look for: said, asked, replied, answered, whispered, shouted, yelled, screamed, muttered, murmured, declared, exclaimed, announced, stated, continued, added, agreed, disagreed, interrupted, demanded, insisted, suggested, warned, threatened, promised, admitted, confessed, lied, joked, teased, mocked, laughed, cried, sobbed, sighed, groaned, grunted, hissed, growled, roared, bellowed, boomed, thundered, breathed, gasped, choked, stammered, stuttered, blurted, snapped, barked, spat
+**SPEECH VERBS BY CATEGORY:**
+COMMON: said, asked, replied, answered, responded, continued, added
+LOUD: shouted, yelled, screamed, roared, bellowed, boomed, thundered
+QUIET: whispered, muttered, murmured, breathed
+EMOTIONAL: laughed, cried, sobbed, sighed, groaned, gasped, choked
+AGGRESSIVE: hissed, growled, snarled, barked, snapped, spat
+FORMAL: declared, announced, stated, proclaimed
+QUESTIONING: demanded, insisted, suggested, warned, threatened
+SPEECH ISSUES: stammered, stuttered, blurted, interrupted
 
 **METHOD 2: ACTION BEATS (High Confidence)**
 
@@ -224,11 +232,17 @@ EXCEPTION: Always use "System" for LitRPG game interfaces, regardless of other n
 | Relationship Words | son, grandson, boyfriend, husband, fiancé, widower | daughter, granddaughter, girlfriend, wife, fiancée, widow |
 | Physical Description | "the man", "the boy", "the male" | "the woman", "the girl", "the female" |
 
+**Gender Edge Cases (Ambiguous Names):**
+- "Alex picked up the sword" → gender=unknown (no pronouns - could be male or female)
+- "Sam's deep voice echoed" → gender=male (contextual clue: deep voice)
+- "Taylor adjusted her armor" → gender=female (pronoun "her")
+- "Jordan smiled" → gender=unknown (no evidence)
+
 **Default Gender Rules:**
 
 | Entity Type | Default Gender | Reasoning |
 |-------------|----------------|-----------|
-| System/Interface/AI | female | LitRPG genre convention |
+| System/Interface/AI | female | **CRITICAL: LitRPG genre convention. Game interfaces and AI assistants are voiced as female (like Siri, Alexa). This is industry standard.** |
 | Monsters/Beasts | male | Genre convention (override if pronouns indicate otherwise) |
 | Dragons | male | Genre convention (override if pronouns indicate otherwise) |
 | Spirits/Ghosts | unknown | Too varied to assume |
@@ -435,32 +449,26 @@ Output: canonicalName="Protagonist", variations=["Protagonist"], gender="unknown
 
 ---
 
-## DO vs DO NOT
+## DO vs DO NOT (TOP 7 CRITICAL RULES)
 
 <do_list>
 ✓ DO include every character who speaks dialogue (in quotes, brackets, etc.)
 ✓ DO include the narrator/protagonist if they speak in first-person
 ✓ DO include the System for [bracketed LitRPG messages]
-✓ DO include non-human speakers (monsters, AI, spirits, magical items)
-✓ DO merge same-person references into ONE entry
-✓ DO include ALL name variations in the variations array
+✓ DO merge same-person references into ONE entry with ALL variations
 ✓ DO use the most specific proper name as canonicalName
 ✓ DO base gender on evidence (pronouns, titles, descriptions)
 ✓ DO use "unknown" when gender cannot be determined
-✓ DO output valid JSON only
 </do_list>
 
 <do_not_list>
 ✗ DO NOT include characters who are only mentioned but never speak
-✗ DO NOT include characters who are only addressed (vocative case)
+✗ DO NOT treat vocative names (inside quotes) as speakers
 ✗ DO NOT create duplicate entries for the same person
 ✗ DO NOT guess gender without evidence
 ✗ DO NOT include characters from reported/indirect speech
-✗ DO NOT add explanatory text outside the JSON
-✗ DO NOT use markdown formatting around the JSON
-✗ DO NOT hallucinate characters not present in the text
-✗ DO NOT skip system messages - they ARE dialogue
-✗ DO NOT forget telepathic/mental communication
+✗ DO NOT add any text outside the JSON
+✗ DO NOT skip system messages or telepathic communication
 </do_not_list>
 
 ---
@@ -563,7 +571,17 @@ Before outputting your JSON, verify:
 □ No non-speaking characters are included (mentioned ≠ speaking)
 □ Vocative names (inside quotes) are not treated as speakers
 □ Output is valid JSON with no extra text
+□ **CHARACTER COUNT CHECK: If you found less than 2 characters, verify you didn't miss Narrator/Protagonist or System**
 </checklist>
+
+<fallback_instruction>
+**WHEN UNCERTAIN:**
+If you cannot determine who is speaking a piece of dialogue after trying all methods:
+1. Do NOT skip the dialogue
+2. Look for the most recently active character in the scene
+3. If truly ambiguous, attribute to "Narrator" or "Protagonist" for first-person text
+4. Never invent characters not present in the text
+</fallback_instruction>
 `,
     userTemplate: `<input_text>
 {{text}}
@@ -655,6 +673,18 @@ Follow this systematic process:
 Input: ["Protagonist" (unknown), "Jason" (male)]
 If context suggests Jason is the narrator → Merge
 Output: keep="Jason", absorb=["Protagonist"], variations=["Jason", "Protagonist"], gender="male"
+
+**CONTEXT MATCHING (when unsure if Protagonist = Named Character):**
+- Block 1: "Protagonist" (male, uses sword)
+- Block 5: "Jason" (male, sword fighter)
+→ MERGE (same gender + same weapon = strong signal)
+
+- Block 1: "Protagonist" (unknown)
+- Block 5: "Sarah" (female)
+→ DON'T MERGE (no gender confirmation for Protagonist)
+
+- Both appear with first-person "I" narration → Same person
+- Different speech patterns/vocabulary → Could be different POV characters
 </protagonist_rule>
 
 ### RULE 2: SYSTEM/INTERFACE UNIFICATION
@@ -671,11 +701,20 @@ Output: keep="Jason", absorb=["Protagonist"], variations=["Jason", "Protagonist"
 - Game System
 - [System]
 
-**ACTION:** Merge ALL into a single "System" entry with gender="female".
+**DEFAULT ACTION:** Merge ALL into a single "System" entry with gender="female".
 
-**EXAMPLE:**
+**EXCEPTION - MULTIPLE AI SYSTEMS:**
+If the text explicitly mentions different AI systems (e.g., "System A" vs "System B", or "Main System" vs "Dungeon System"):
+- Keep them as SEPARATE entries
+- Only merge variants that clearly refer to the SAME system
+
+**EXAMPLE (Standard):**
 Input: ["System", "Interface", "Notification", "Blue Box"]
 Output: keep="System", absorb=["Interface", "Notification", "Blue Box"], variations=["System", "Interface", "Notification", "Blue Box"], gender="female"
+
+**EXAMPLE (Multiple Systems):**
+Input: ["Main System", "Dungeon Core", "Shop Interface"]
+If these are explicitly different entities in text → keep separate, don't merge
 </system_rule>
 
 ### RULE 3: NAME HIERARCHY MERGING
@@ -782,12 +821,19 @@ Output: keep="Jackson Miller", absorb=["Jack"], variations=["Jackson Miller", "J
 ### ANTI-RULE 3: SIMILAR BUT DISTINCT NAMES
 
 <similar_names>
-**DO NOT MERGE unless CERTAIN they are the same:**
-- "Jon" + "John" → Could be different spellings OR different people
-- "Sara" + "Sarah" → Could be different people
-- "Marc" + "Mark" → Could be different people
+**CONTEXT-DEPENDENT RULE for similar spellings:**
 
-**RULE:** If there's any doubt, put both in "unchanged".
+**LIKELY SAME PERSON (MERGE):**
+- "Jon" + "John" in SAME BOOK with SAME GENDER → likely typo/variant, MERGE
+- "Sara" + "Sarah" with same role/description → likely same, MERGE
+- Similar names that NEVER appear in the same scene → likely same person
+
+**LIKELY DIFFERENT PEOPLE (DON'T MERGE):**
+- "Jon" + "John" with DIFFERENT GENDERS → different people
+- Similar names that appear in the SAME SCENE → definitely different people
+- Names with different contexts (e.g., one is a guard, one is a merchant)
+
+**DECISION RULE:** If similar names have same gender AND never interact → MERGE. If they appear together or have different attributes → keep separate.
 </similar_names>
 
 ### ANTI-RULE 4: DIFFERENT GENDERS
@@ -865,13 +911,30 @@ When merging, the variations array MUST include:
 3. All variations from ALL merged entries
 4. Any additional aliases/titles discovered
 
+**CRITICAL - DEDUPLICATE VARIATIONS:**
+If the same name appears in multiple entries, include it ONLY ONCE in the final variations array.
+
 **EXAMPLE:**
 Merging:
 - Entry 1: canonicalName="Protagonist", variations=["Protagonist"]
 - Entry 2: canonicalName="Jason", variations=["Jason", "Jay"]
-- Entry 3: canonicalName="The Hero", variations=["The Hero", "Hero"]
+- Entry 3: canonicalName="The Hero", variations=["The Hero", "Hero", "Jason"]
+
+Note: "Jason" appears in Entry 2 AND Entry 3
 
 Result variations: ["Jason", "Jay", "Protagonist", "The Hero", "Hero"]
+(Jason appears ONCE, not twice - duplicates removed)
+
+**CHAIN MERGE HANDLING:**
+If A→B and B→C (transitive merge):
+1. Find the most specific name across ALL entries
+2. Keep that one as canonical
+3. Absorb all others
+
+Example: "Protagonist"→"Jay"→"Jason Miller"
+- Most specific = "Jason Miller"
+- Result: keep="Jason Miller", absorb=["Protagonist", "Jay"]
+- variations=["Jason Miller", "Jason", "Jay", "Protagonist", "Miller"]
 </variations_combination>
 
 </resolution_strategies>
@@ -1003,6 +1066,14 @@ Verification:
 
 If any character is missing from the output, the merge operation FAILS.
 </critical_warning>
+
+<fallback_instruction>
+**WHEN UNCERTAIN ABOUT A MERGE:**
+1. If unsure whether two characters are the same → put BOTH in "unchanged" (conservative)
+2. If variations array would have duplicates → deduplicate them
+3. If chain merge is needed (A→B→C) → find most specific name, absorb all others
+4. Never drop a character - every input must appear in output
+</fallback_instruction>
 `,
     userTemplate: `<character_list>
 {{characters}}
@@ -1089,7 +1160,14 @@ Apply these methods in STRICT ORDER of priority. Stop when you find a definitive
 - "Dialogue!" **shouted CHARACTER** → Speaker = CHARACTER
 - "Dialogue," **replied the CHARACTER** → Speaker = CHARACTER
 
-**SPEECH VERBS:** said, asked, replied, answered, whispered, shouted, yelled, screamed, muttered, declared, exclaimed, announced, stated, demanded, insisted, suggested, warned, agreed, disagreed, continued, added, interrupted, gasped, sighed, groaned, hissed, growled, laughed, cried
+**SPEECH VERBS BY CATEGORY:**
+COMMON: said, asked, replied, answered, continued, added
+LOUD: shouted, yelled, screamed
+QUIET: whispered, muttered
+EMOTIONAL: laughed, cried, gasped, sighed, groaned
+AGGRESSIVE: hissed, growled, snapped
+FORMAL: declared, announced, stated, exclaimed
+OTHER: demanded, insisted, suggested, warned, agreed, disagreed, interrupted
 
 **RULE:** If there's an explicit "said CHARACTER" tag, that CHARACTER is the speaker. This is the most reliable signal.
 </explicit_tags>
@@ -1123,6 +1201,12 @@ Apply these methods in STRICT ORDER of priority. Stop when you find a definitive
 → The character acting is the speaker
 
 **RULE:** The character performing physical actions in the same paragraph as dialogue is almost always the speaker.
+
+**TIE-BREAKER (Action Beat vs First-Person):**
+When paragraph has BOTH another character's action AND "I":
+- The action CLOSEST to the dialogue wins
+- "I stood up. 'Hello!' John waved." → TWO actions: "I stood" + "John waved" → "John waved" is CLOSER to dialogue → Speaker = John
+- "I waved. 'Hello!'" → ONE action: "I waved" → Speaker = Protagonist
 </action_beats>
 
 ### PRIORITY 4: FIRST-PERSON NARRATOR (Context Dependent)
@@ -1144,12 +1228,19 @@ Apply these methods in STRICT ORDER of priority. Stop when you find a definitive
 <conversation_flow>
 **USE WHEN:** Methods 1-4 don't provide a clear answer.
 
-**ALTERNATING PATTERN:**
+**TWO-PERSON ALTERNATING PATTERN:**
 In two-person conversations, speakers typically alternate:
 - Paragraph N: Speaker A speaks
 - Paragraph N+1: Speaker B responds
 - Paragraph N+2: Speaker A responds
 - etc.
+
+**THREE+ PERSON CONVERSATION:**
+- Paragraph N: A speaks (to B)
+- Paragraph N+1: Most likely B responds (addressed person)
+- Paragraph N+2: Could be A (continuing) OR C (joining)
+- Look for vocative ("B, what do you think?") to identify who responds
+- New topic introduction often means new speaker (C joining)
 
 **RESPONSE CONTEXT:**
 - If dialogue answers a question, speaker is likely the one being asked
@@ -1254,6 +1345,19 @@ Look for who is SAYING these words, not who is MENTIONED in them.
 - Sarah walks in (action 1, further from dialogue)
 - John stands up (action 2, closer to dialogue)
 - Speaker = John (his action is closest to the dialogue)
+
+**BOTH CHARACTERS ACT - ACTIVE vs PASSIVE:**
+"Sarah slapped John. John reeled. 'Why?!'"
+- "slapped" = ACTIVE action (Sarah initiates)
+- "reeled" = PASSIVE reaction (John receives)
+- **RULE:** ACTIVE action trumps PASSIVE reaction
+- Speaker = Sarah (closest ACTIVE action)
+
+**BOTH CHARACTERS ACT - BOTH ACTIVE:**
+"Sarah glared at John. John stepped back. 'Stay away!'"
+- Both are active actions
+- "stepped back" is CLOSEST to dialogue
+- Speaker = John
 </proximity_warning>
 
 </critical_warnings>
@@ -1317,12 +1421,19 @@ Paragraph: I couldn't believe it. "This is impossible!" I said.
 - Paragraph contains dialogue from multiple characters
 - Multiple speech tags present
 
-**ACTION:** Assign based on the DOMINANT or FIRST speaker.
+**HOW TO DETERMINE DOMINANT SPEAKER:**
+1. Count sentences/lines per speaker
+2. Most sentences = dominant speaker
+3. If tie → first speaker wins
 
 **EXAMPLE:**
+"Run!" John (1). "Where?" Sarah (1). "To the forest!" John (1). "Now!" John (1).
+→ John = 3 sentences, Sarah = 1
+→ Assign to John (dominant)
+
+**SIMPLE CASE:**
 "Run!" John shouted. "I'm trying!" Sarah replied.
-→ Could assign to John (first speaker) or treat as multi-speaker
-→ Usually assign to the primary/first speaker
+→ John speaks first → Assign to John
 </multiple_case>
 
 ### CASE E: No Clear Speaker
@@ -1340,6 +1451,12 @@ Paragraph: "I suppose you're right."
 (No other clues in paragraph)
 → Use alternating pattern from previous paragraphs
 → Or assign to most likely speaker from scene context
+
+**ABSOLUTE LAST RESORT:**
+If after trying ALL methods you STILL cannot determine the speaker:
+→ Assign to the most recently active/speaking character in the scene
+→ DO NOT leave any paragraph unassigned
+→ DO NOT guess randomly - use scene context
 </unclear_case>
 
 </special_cases>
