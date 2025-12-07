@@ -162,6 +162,9 @@ export class PipelineBuilder implements IPipelineBuilder {
       .addStep(StepNames.SAVE, {
         createAudioMerger: (cfg: MergerConfig) => this.audioMergerFactory.create(cfg),
       })
+      .addStep(StepNames.CLEANUP, {
+        logger: this.logger,
+      })
       .build();
 
     return buildPipelineFromConfig(config, this.stepRegistry, pipeline);

@@ -20,6 +20,8 @@ import {
   type AudioMergeStepOptions,
   SaveStep,
   type SaveStepOptions,
+  CleanupStep,
+  type CleanupStepOptions,
 } from './steps';
 
 /**
@@ -35,6 +37,7 @@ export const StepNames = {
   TTS_CONVERSION: 'tts-conversion',
   AUDIO_MERGE: 'audio-merge',
   SAVE: 'save',
+  CLEANUP: 'cleanup',
 } as const;
 
 export type StepName = typeof StepNames[keyof typeof StepNames];
@@ -97,6 +100,12 @@ export function createDefaultStepRegistry(): StepRegistry {
     StepNames.SAVE,
     (options) => new SaveStep(options),
     'Saves merged files to disk'
+  );
+
+  registry.register<CleanupStepOptions>(
+    StepNames.CLEANUP,
+    (options) => new CleanupStep(options),
+    'Cleans up temporary files'
   );
 
   return registry;

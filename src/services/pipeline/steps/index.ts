@@ -53,3 +53,9 @@ export {
   createSaveStep,
   type SaveStepOptions,
 } from './SaveStep';
+
+export {
+  CleanupStep,
+  createCleanupStep,
+  type CleanupStepOptions,
+} from './CleanupStep';
