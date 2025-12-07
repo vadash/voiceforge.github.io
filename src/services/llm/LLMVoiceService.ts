@@ -6,6 +6,7 @@ import type {
   MergeResponse,
 } from '@/state/types';
 import type { ILogger, ProgressCallback } from '../interfaces';
+import { defaultConfig } from '@/config';
 import { LLMApiClient } from './LLMApiClient';
 import { buildExtractPrompt, buildMergePrompt, buildAssignPrompt } from './PromptBuilders';
 import { validateExtractResponse, validateMergeResponse, validateAssignResponse, parseAssignResponse, fixMergeResponse } from './ResponseValidators';
@@ -106,6 +107,11 @@ export class LLMVoiceService {
 
       const parsed = JSON.parse(response) as ExtractResponse;
       allCharacters.push(...parsed.characters);
+
+      // Small delay between requests to avoid overwhelming LLM server
+      if (i < blocks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
 
     // Simple merge by canonicalName first
@@ -124,7 +130,7 @@ export class LLMVoiceService {
   }
 
   /**
-   * Assign: Assign speakers to sentences (parallel, up to 20 concurrent)
+   * Assign: Assign speakers to sentences (parallel, respects maxConcurrentRequests)
    */
   async assignSpeakers(
     blocks: TextBlock[],
@@ -132,8 +138,8 @@ export class LLMVoiceService {
     characters: LLMCharacter[],
     onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> {
-    this.logger?.info(`[Assign] Starting (${blocks.length} blocks)`);
-    const MAX_CONCURRENT = 20;
+    const maxConcurrent = defaultConfig.llm.maxConcurrentRequests;
+    this.logger?.info(`[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent)`);
     const results: SpeakerAssignment[] = [];
     let completed = 0;
 
@@ -143,12 +149,12 @@ export class LLMVoiceService {
     const { nameToCode, codeToName } = buildCodeMapping(characters);
 
     // Process blocks in batches
-    for (let i = 0; i < blocks.length; i += MAX_CONCURRENT) {
+    for (let i = 0; i < blocks.length; i += maxConcurrent) {
       if (this.abortController.signal.aborted) {
         throw new Error('Operation cancelled');
       }
 
-      const batch = blocks.slice(i, i + MAX_CONCURRENT);
+      const batch = blocks.slice(i, i + maxConcurrent);
       this.logger?.info(`[Assign] Processing batch of ${batch.length} blocks`);
       const batchPromises = batch.map((block, batchIndex) => {
         const blockNum = i + batchIndex + 1;
@@ -170,6 +176,11 @@ export class LLMVoiceService {
         results.push(...blockAssignments);
         completed++;
         onProgress?.(completed, blocks.length);
+      }
+
+      // Small delay between batches to avoid overwhelming LLM server
+      if (i + maxConcurrent < blocks.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
