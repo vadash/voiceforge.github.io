@@ -431,6 +431,48 @@ export interface IEdgeTTSServiceFactory {
 }
 
 // ============================================================================
+// Reusable TTS Service Interfaces
+// ============================================================================
+
+/**
+ * Connection state for reusable WebSocket connections
+ */
+export type ConnectionState = 'DISCONNECTED' | 'CONNECTING' | 'READY' | 'BUSY';
+
+/**
+ * Options for sending a TTS request
+ */
+export interface TTSSendOptions {
+  text: string;
+  config: TTSConfig;
+  requestId?: string;
+}
+
+/**
+ * Reusable TTS service interface - maintains persistent WebSocket connection
+ */
+export interface IReusableTTSService {
+  /** Get current connection state */
+  getState(): ConnectionState;
+  /** Connect to the Edge TTS WebSocket API */
+  connect(): Promise<void>;
+  /** Send TTS request and receive audio data */
+  send(options: TTSSendOptions): Promise<Uint8Array>;
+  /** Disconnect and cleanup */
+  disconnect(): void;
+  /** Check if connection is available for use */
+  isReady(): boolean;
+}
+
+/**
+ * Factory for creating reusable TTS service instances
+ */
+export interface IReusableTTSServiceFactory {
+  /** Create a new reusable TTS service instance */
+  create(): IReusableTTSService;
+}
+
+// ============================================================================
 // VoiceAssigner Factory Interface
 // ============================================================================
 

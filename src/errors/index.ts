@@ -275,6 +275,26 @@ export function insufficientVoicesError(maleCount: number, femaleCount: number):
 // ============================================================================
 
 /**
+ * Retriable error - signals the caller should retry with a new connection
+ */
+export class RetriableError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'RetriableError';
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, RetriableError);
+    }
+  }
+}
+
+/**
+ * Check if error indicates the connection should be retried
+ */
+export function isRetriableError(error: unknown): error is RetriableError {
+  return error instanceof RetriableError;
+}
+
+/**
  * Check if an error is an AppError
  */
 export function isAppError(error: unknown): error is AppError {

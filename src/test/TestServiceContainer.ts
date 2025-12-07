@@ -16,11 +16,9 @@ import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
   IAudioMergerFactory,
-  IEdgeTTSServiceFactory,
   IVoiceAssignerFactory,
   ITextBlockSplitter,
   IVoicePoolBuilder,
-  TTSWorkerOptions,
 } from '@/services/interfaces';
 import type { IPipelineRunner } from '@/services/pipeline/types';
 
@@ -87,13 +85,6 @@ export function createTestContainer(options: TestContainerOptions = {}): {
     ServiceTypes.LLMServiceFactory,
     () => ({
       create: () => mocks.llm,
-    })
-  );
-
-  container.registerSingleton<IEdgeTTSServiceFactory>(
-    ServiceTypes.EdgeTTSServiceFactory,
-    () => ({
-      create: (options: TTSWorkerOptions) => mocks.tts,
     })
   );
 

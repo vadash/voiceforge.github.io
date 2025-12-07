@@ -1,34 +1,43 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { TTSWorkerPool, type PoolTask, type WorkerPoolOptions } from './TTSWorkerPool';
-import type { IEdgeTTSServiceFactory, ITTSService, TTSWorkerOptions } from './interfaces';
+import { TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
+import type { PoolTask } from './interfaces';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '@/state/types';
+
+// Mock the TTSConnectionPool
+vi.mock('./TTSConnectionPool', () => {
+  return {
+    TTSConnectionPool: vi.fn().mockImplementation(() => ({
+      execute: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      warmup: vi.fn().mockResolvedValue(undefined),
+      shutdown: vi.fn(),
+      getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+    })),
+  };
+});
+
+// Get the mocked class for access in tests
+import { TTSConnectionPool } from './TTSConnectionPool';
+const MockedTTSConnectionPool = vi.mocked(TTSConnectionPool);
 
 describe('TTSWorkerPool', () => {
   let pool: TTSWorkerPool;
-  let mockFactory: IEdgeTTSServiceFactory;
-  let mockServices: Map<number, { service: ITTSService; options: TTSWorkerOptions }>;
   let defaultOptions: WorkerPoolOptions;
   let defaultVoiceConfig: VoiceConfig;
+  let mockExecute: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.clearAllMocks();
 
-    mockServices = new Map();
+    // Get a fresh mock execute function for each test
+    mockExecute = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
 
-    mockFactory = {
-      create: vi.fn((options: TTSWorkerOptions) => {
-        const service: ITTSService = {
-          start: vi.fn(() => {
-            // Simulate async completion after a short delay
-            setTimeout(() => {
-              options.onComplete(new Uint8Array([1, 2, 3]));
-            }, 100);
-          }),
-        };
-        mockServices.set(options.indexPart, { service, options });
-        return service;
-      }),
-    };
+    MockedTTSConnectionPool.mockImplementation(() => ({
+      execute: mockExecute,
+      warmup: vi.fn().mockResolvedValue(undefined),
+      shutdown: vi.fn(),
+      getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+    }));
 
     defaultVoiceConfig = {
       voice: 'Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)',
@@ -54,7 +63,7 @@ describe('TTSWorkerPool', () => {
   });
 
   const createPool = (options: Partial<WorkerPoolOptions> = {}) => {
-    return new TTSWorkerPool(mockFactory, { ...defaultOptions, ...options });
+    return new TTSWorkerPool({ ...defaultOptions, ...options });
   };
 
   const createTask = (partIndex: number): PoolTask => ({
@@ -72,13 +81,13 @@ describe('TTSWorkerPool', () => {
       expect(pool.getProgress().total).toBe(1);
     });
 
-    it('spawns worker for task', async () => {
+    it('processes task through connection pool', async () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(mockFactory.create).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -91,23 +100,29 @@ describe('TTSWorkerPool', () => {
     });
 
     it('respects maxWorkers limit', async () => {
-      // Create a factory that doesn't auto-complete, so workers stay active
-      let completionCallbacks: Array<(data: Uint8Array) => void> = [];
-      mockFactory.create = vi.fn((options: TTSWorkerOptions) => ({
-        start: vi.fn(() => {
-          // Store callback for manual completion later
-          completionCallbacks.push(options.onComplete);
-        }),
+      // Create execute that doesn't resolve immediately
+      let resolvers: Array<(value: Uint8Array) => void> = [];
+      mockExecute = vi.fn().mockImplementation(() => {
+        return new Promise<Uint8Array>((resolve) => {
+          resolvers.push(resolve);
+        });
+      });
+
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: vi.fn().mockResolvedValue(undefined),
+        shutdown: vi.fn(),
+        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
       }));
 
       pool = createPool({ maxWorkers: 2 });
       pool.addTasks([createTask(0), createTask(1), createTask(2), createTask(3)]);
 
-      // Process the queue once
+      // Process the queue
       await vi.advanceTimersByTimeAsync(100);
 
-      // Should only spawn 2 workers (maxWorkers limit)
-      expect(mockFactory.create).toHaveBeenCalledTimes(2);
+      // Should only start 2 tasks (maxWorkers limit)
+      expect(mockExecute).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -116,7 +131,7 @@ describe('TTSWorkerPool', () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(100);
 
       const completedAudio = pool.getCompletedAudio();
       expect(completedAudio.size).toBe(1);
@@ -128,7 +143,7 @@ describe('TTSWorkerPool', () => {
       pool = createPool({ onTaskComplete });
       pool.addTask(createTask(0));
 
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(100);
 
       expect(onTaskComplete).toHaveBeenCalledWith(0, expect.any(Uint8Array));
     });
@@ -138,7 +153,7 @@ describe('TTSWorkerPool', () => {
       pool = createPool({ onAllComplete });
       pool.addTask(createTask(0));
 
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(100);
 
       expect(onAllComplete).toHaveBeenCalledTimes(1);
     });
@@ -155,36 +170,58 @@ describe('TTSWorkerPool', () => {
     });
 
     it('processes next task from queue after completion', async () => {
+      let resolvers: Array<(value: Uint8Array) => void> = [];
+      mockExecute = vi.fn().mockImplementation(() => {
+        return new Promise<Uint8Array>((resolve) => {
+          resolvers.push(resolve);
+        });
+      });
+
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: vi.fn().mockResolvedValue(undefined),
+        shutdown: vi.fn(),
+        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+      }));
+
       pool = createPool({ maxWorkers: 1 });
       pool.addTasks([createTask(0), createTask(1)]);
 
       await vi.advanceTimersByTimeAsync(50);
-      expect(mockFactory.create).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(200);
-      expect(mockFactory.create).toHaveBeenCalledTimes(2);
+      // Complete first task
+      resolvers[0](new Uint8Array([1]));
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(mockExecute).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('task errors and retries', () => {
     it('retries failed tasks', async () => {
       let attemptCount = 0;
+      const { RetriableError } = await import('@/errors');
 
-      mockFactory.create = vi.fn((options: TTSWorkerOptions) => ({
-        start: vi.fn(() => {
-          attemptCount++;
-          if (attemptCount < 3) {
-            setTimeout(() => options.onError(new Error('Network error')), 50);
-          } else {
-            setTimeout(() => options.onComplete(new Uint8Array([1])), 50);
-          }
-        }),
+      mockExecute = vi.fn().mockImplementation(() => {
+        attemptCount++;
+        if (attemptCount < 3) {
+          return Promise.reject(new RetriableError('Network error'));
+        }
+        return Promise.resolve(new Uint8Array([1]));
+      });
+
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: vi.fn().mockResolvedValue(undefined),
+        shutdown: vi.fn(),
+        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
       }));
 
       pool = createPool();
       pool.addTask(createTask(0));
 
-      // Run through retries: 50ms (1st fail) + 5000ms (delay) + 50ms (2nd fail) + 10000ms (delay) + 50ms (success)
+      // Run through retries with exponential backoff
       await vi.advanceTimersByTimeAsync(20000);
 
       expect(attemptCount).toBe(3);
@@ -193,11 +230,15 @@ describe('TTSWorkerPool', () => {
 
     it('calls onStatusUpdate on retry', async () => {
       const onStatusUpdate = vi.fn();
+      const { RetriableError } = await import('@/errors');
 
-      mockFactory.create = vi.fn((options: TTSWorkerOptions) => ({
-        start: vi.fn(() => {
-          setTimeout(() => options.onError(new Error('Error')), 50);
-        }),
+      mockExecute = vi.fn().mockRejectedValue(new RetriableError('Error'));
+
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: vi.fn().mockResolvedValue(undefined),
+        shutdown: vi.fn(),
+        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
       }));
 
       pool = createPool({ onStatusUpdate });
@@ -213,12 +254,18 @@ describe('TTSWorkerPool', () => {
 
     it('respects error cooldown', async () => {
       const createTimes: number[] = [];
+      const { RetriableError } = await import('@/errors');
 
-      mockFactory.create = vi.fn((options: TTSWorkerOptions) => ({
-        start: vi.fn(() => {
-          createTimes.push(Date.now());
-          setTimeout(() => options.onError(new Error('Error')), 10);
-        }),
+      mockExecute = vi.fn().mockImplementation(() => {
+        createTimes.push(Date.now());
+        return Promise.reject(new RetriableError('Error'));
+      });
+
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: vi.fn().mockResolvedValue(undefined),
+        shutdown: vi.fn(),
+        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
       }));
 
       pool = createPool({
@@ -253,8 +300,11 @@ describe('TTSWorkerPool', () => {
 
       await vi.advanceTimersByTimeAsync(0);
 
-      const createdOptions = mockServices.get(0)?.options;
-      expect(createdOptions?.config.voice).toContain('ru-RU, DmitryNeural');
+      expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+        config: expect.objectContaining({
+          voice: expect.stringContaining('ru-RU, DmitryNeural'),
+        }),
+      }));
     });
 
     it('uses default voice when task has no override', async () => {
@@ -263,21 +313,17 @@ describe('TTSWorkerPool', () => {
 
       await vi.advanceTimersByTimeAsync(0);
 
-      const createdOptions = mockServices.get(0)?.options;
-      expect(createdOptions?.config.voice).toBe(defaultVoiceConfig.voice);
+      expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+        config: expect.objectContaining({
+          voice: defaultVoiceConfig.voice,
+        }),
+      }));
     });
   });
 
   describe('status updates', () => {
-    it('forwards status updates from workers', async () => {
+    it('sends status updates during processing', async () => {
       const statusUpdates: StatusUpdate[] = [];
-
-      mockFactory.create = vi.fn((options: TTSWorkerOptions) => ({
-        start: vi.fn(() => {
-          options.onStatusUpdate({ partIndex: options.indexPart, message: 'Processing...', isComplete: false });
-          setTimeout(() => options.onComplete(new Uint8Array([1])), 50);
-        }),
-      }));
 
       pool = createPool({
         onStatusUpdate: (update) => statusUpdates.push(update),
@@ -288,7 +334,7 @@ describe('TTSWorkerPool', () => {
 
       expect(statusUpdates).toContainEqual(expect.objectContaining({
         partIndex: 0,
-        message: 'Processing...',
+        message: expect.stringContaining('Processing'),
       }));
     });
   });
@@ -315,7 +361,7 @@ describe('TTSWorkerPool', () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(100);
 
       const audio1 = pool.getCompletedAudio();
       const audio2 = pool.getCompletedAudio();
@@ -337,7 +383,15 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('clear', () => {
-    it('clears all state', async () => {
+    it('clears all state and shuts down connection pool', async () => {
+      const mockShutdown = vi.fn();
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: vi.fn().mockResolvedValue(undefined),
+        shutdown: mockShutdown,
+        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+      }));
+
       pool = createPool();
       pool.addTasks([createTask(0), createTask(1)]);
 
@@ -345,6 +399,7 @@ describe('TTSWorkerPool', () => {
 
       pool.clear();
 
+      expect(mockShutdown).toHaveBeenCalled();
       expect(pool.getProgress()).toEqual({
         completed: 0,
         total: 0,
@@ -355,39 +410,36 @@ describe('TTSWorkerPool', () => {
     });
   });
 
-  describe('worker start delay', () => {
-    it('delays between starting workers', async () => {
-      const startTimes: number[] = [];
-      let currentTime = 0;
-
-      vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
-
-      mockFactory.create = vi.fn((options: TTSWorkerOptions) => ({
-        start: vi.fn(() => {
-          startTimes.push(currentTime);
-          // Simulate long-running task
-          setTimeout(() => options.onComplete(new Uint8Array([1])), 1000);
-        }),
+  describe('warmup', () => {
+    it('warms up connection pool', async () => {
+      const mockWarmup = vi.fn().mockResolvedValue(undefined);
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: mockWarmup,
+        shutdown: vi.fn(),
+        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
       }));
 
-      pool = createPool({
-        maxWorkers: 3,
-        ttsConfig: {
-          ...defaultOptions.ttsConfig!,
-          workerStartDelay: 50,
-        },
-      });
+      pool = createPool({ maxWorkers: 5 });
+      await pool.warmup();
 
-      pool.addTasks([createTask(0), createTask(1), createTask(2)]);
+      expect(mockWarmup).toHaveBeenCalledWith(5);
+    });
+  });
 
-      // Advance time in small increments to trigger delays
-      for (let i = 0; i < 20; i++) {
-        currentTime += 30;
-        await vi.advanceTimersByTimeAsync(30);
-      }
+  describe('getPoolStats', () => {
+    it('returns connection pool stats', () => {
+      const mockStats = { total: 3, ready: 2, busy: 1, disconnected: 0 };
+      MockedTTSConnectionPool.mockImplementation(() => ({
+        execute: mockExecute,
+        warmup: vi.fn().mockResolvedValue(undefined),
+        shutdown: vi.fn(),
+        getStats: vi.fn().mockReturnValue(mockStats),
+      }));
 
-      // Workers should have started with delays between them
-      expect(mockFactory.create).toHaveBeenCalled();
+      pool = createPool();
+
+      expect(pool.getPoolStats()).toEqual(mockStats);
     });
   });
 });

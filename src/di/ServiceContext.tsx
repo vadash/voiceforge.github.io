@@ -20,7 +20,6 @@ import { LLMVoiceService } from '@/services/llm';
 import { TTSWorkerPool } from '@/services/TTSWorkerPool';
 import { AudioMerger } from '@/services/AudioMerger';
 import { VoiceAssigner } from '@/services/VoiceAssigner';
-import { EdgeTTSService } from '@/services/EdgeTTSService';
 import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
 import { PipelineBuilder, createDefaultStepRegistry } from '@/services/pipeline';
 import type { LogStore } from '@/stores/LogStore';
@@ -34,14 +33,12 @@ import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
   IAudioMergerFactory,
-  IEdgeTTSServiceFactory,
   IVoiceAssignerFactory,
   LLMServiceFactoryOptions,
-  WorkerPoolOptions,
   MergerConfig,
-  TTSWorkerOptions,
   VoiceAssignerOptions,
 } from '@/services/interfaces';
+import type { WorkerPoolOptions } from '@/services/TTSWorkerPool';
 import type { IPipelineRunner } from '@/services/pipeline/types';
 import type { IPipelineBuilder } from '@/services/pipeline';
 
@@ -236,23 +233,12 @@ export function createProductionContainer(
     })
   );
 
-  // Register EdgeTTS service factory
-  container.registerSingleton<IEdgeTTSServiceFactory>(
-    ServiceTypes.EdgeTTSServiceFactory,
-    () => ({
-      create: (options: TTSWorkerOptions) => new EdgeTTSService(options),
-    })
-  );
-
-  // Register worker pool factory (injects EdgeTTS factory)
+  // Register worker pool factory
   container.registerSingleton<IWorkerPoolFactory>(
     ServiceTypes.WorkerPoolFactory,
-    () => {
-      const edgeTTSFactory = container.get<IEdgeTTSServiceFactory>(ServiceTypes.EdgeTTSServiceFactory);
-      return {
-        create: (options: WorkerPoolOptions) => new TTSWorkerPool(edgeTTSFactory, options),
-      };
-    }
+    () => ({
+      create: (options: WorkerPoolOptions) => new TTSWorkerPool(options),
+    })
   );
 
   // Register audio merger factory (injects FFmpegService)
@@ -290,7 +276,6 @@ export interface ServiceOverrides {
   logger?: ILogger;
   secureStorage?: ISecureStorage;
   ffmpegService?: IFFmpegService;
-  edgeTTSServiceFactory?: IEdgeTTSServiceFactory;
   voiceAssignerFactory?: IVoiceAssignerFactory;
   voicePoolBuilder?: IVoicePoolBuilder;
 }
@@ -341,18 +326,6 @@ export function createTestContainer(overrides: ServiceOverrides = {}): ServiceCo
     container.registerSingleton<IVoicePoolBuilder>(
       ServiceTypes.VoicePoolBuilder,
       () => new VoicePoolBuilder()
-    );
-  }
-
-  // Register EdgeTTS factory
-  if (overrides.edgeTTSServiceFactory) {
-    container.registerInstance(ServiceTypes.EdgeTTSServiceFactory, overrides.edgeTTSServiceFactory);
-  } else {
-    container.registerSingleton<IEdgeTTSServiceFactory>(
-      ServiceTypes.EdgeTTSServiceFactory,
-      () => ({
-        create: (options: TTSWorkerOptions) => new EdgeTTSService(options),
-      })
     );
   }
 
