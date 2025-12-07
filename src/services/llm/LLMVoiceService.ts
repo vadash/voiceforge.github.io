@@ -185,7 +185,7 @@ export class LLMVoiceService {
     nameToCode: Map<string, string>,
     codeToName: Map<string, string>
   ): Promise<SpeakerAssignment[]> {
-    console.log(`[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`);
+    this.logger?.debug(`[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`);
     const hasSpeech = block.sentences.some(p => SPEECH_SYMBOLS_REGEX.test(p));
 
     if (!hasSpeech) {
