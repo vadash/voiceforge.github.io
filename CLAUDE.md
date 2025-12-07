@@ -250,11 +250,9 @@ dist/
 └── v1/             ← stable v1
 
 Commands:
-npm run build              # builds to dist/latest/
-npm run build:version v1   # builds to dist/v1/
-npm run build:version v2   # builds to dist/v2/
-
-Each build:version automatically adds/updates the entry in dist/index.html.
+git commit -m "Release v1"
+git tag v1
+git push origin master --tags  # one push, triggers once
 
 ## CRITICAL
 
