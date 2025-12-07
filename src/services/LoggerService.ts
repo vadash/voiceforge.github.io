@@ -38,14 +38,11 @@ export class LoggerService implements ILogger {
   }
 
   /**
-   * Log debug message (dev only)
+   * Log debug message (console only - not stored in UI)
    */
   debug(message: string, data?: Record<string, unknown>): void {
-    if (process.env.NODE_ENV === 'development') {
-      const formatted = this.formatMessage(message);
-      console.debug(`[DEBUG] ${formatted}`, data ?? '');
-      this.store?.add('debug', formatted, data);
-    }
+    const formatted = this.formatMessage(message);
+    console.debug(`[DEBUG] ${formatted}`, data ?? '');
   }
 
   /**
@@ -110,9 +107,7 @@ export class NoOpLogger implements ILogger {
  */
 export class ConsoleLogger implements ILogger {
   debug(message: string, data?: Record<string, unknown>): void {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(`[DEBUG] ${message}`, data ?? '');
-    }
+    console.debug(`[DEBUG] ${message}`, data ?? '');
   }
 
   info(message: string, data?: Record<string, unknown>): void {

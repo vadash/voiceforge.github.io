@@ -3,9 +3,7 @@
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start dev server at http://localhost:3000
-npm run build        # Production build to dist/
 npm run type-check   # TypeScript type checking
-npm run preview      # Serve production build locally
 npm run test         # Run all tests once (Vitest)
 ```
 
@@ -51,11 +49,11 @@ The conversion pipeline uses composable steps:
 
 Optional feature for multi-voice audiobooks using LLM-based character detection:
 
-- **TextBlockSplitter**: Splits text into paragraphs and blocks for LLM processing. Uses 16k token blocks for Pass 1, 8k for Pass 2. Large paragraphs (>3000 chars) are split by sentence boundaries.
+- **TextBlockSplitter**: Splits text into paragraphs and blocks for LLM processing. Uses 16k token blocks for extract, 8k for assign. Large paragraphs (>3000 chars) are split by sentence boundaries.
 - **LLMVoiceService** (`src/services/llm/`): Three-pass LLM system using OpenAI-compatible API:
-  - **Extract** (Pass 1): Extracts characters from text blocks (sequential processing, detects gender/name variations)
+  - **Extract**: Extracts characters from text blocks (sequential processing, detects gender/name variations)
   - **Merge**: Deduplicates characters across blocks using LLM (identifies same person with different names)
-  - **Assign** (Pass 2): Assigns speakers to paragraphs (parallel, up to 20 concurrent). Uses 0-based relative indexing per block (0, 1, 2...) instead of absolute indices to improve LLM accuracy. Paragraphs without speech symbols are auto-assigned to narrator, skipping LLM call.
+  - **Assign**: Assigns speakers to paragraphs (parallel, up to 20 concurrent). Uses 0-based relative indexing per block (0, 1, 2...) instead of absolute indices to improve LLM accuracy. Paragraphs without speech symbols are auto-assigned to narrator, skipping LLM call.
   - Uses sparse output format with character codes (A-Z, 0-9, a-z) for token reduction
   - Infinite retry with exponential backoff
   - Logs requests/responses to: `logs/extract_*.json`, `logs/merge_*.json`, `logs/assign_*.json`
@@ -71,7 +69,7 @@ Modern state management using Preact Signals with typed stores:
 - **ConversionStore**: Conversion progress (isProcessing, processedCount, totalCount), status lines, save path handle
 - **DataStore**: Dictionary, text content, book metadata
 - **LLMStore**: LLM settings (enabled, API key, URL, model), processing status, detected characters, voice mappings
-- **LogStore**: Centralized logging service
+- **LogStore**: Centralized logging service. Stores info/warn/error logs with color-coded display (gray/yellow/red). Debug logs go to browser console only (F12).
 - **LanguageStore**: UI language preferences
 
 Settings persist to localStorage.
@@ -123,7 +121,7 @@ components/
 │       └── ExportImportTab.tsx # Settings backup/restore
 │
 ├── status/           # Status/logs components
-│   ├── StatusPanel.tsx   # Log display with filters
+│   ├── StatusPanel.tsx   # Color-coded log display (info=gray, warn=yellow, error=red)
 │   ├── StatusView.tsx    # Full-page logs (mobile)
 │   └── ProgressBar.tsx   # Progress indicator
 │
@@ -245,4 +243,4 @@ Tailwind CSS v3 with custom configuration:
 
 ## CRITICAL
 
-USE bash command for Windows!
+USE bash commands for Windows!

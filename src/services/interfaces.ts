@@ -251,9 +251,9 @@ export interface IFFmpegService {
 // ============================================================================
 
 /**
- * Log levels
+ * Log levels (debug logs go to browser console only)
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = 'info' | 'warn' | 'error';
 
 /**
  * Structured log entry

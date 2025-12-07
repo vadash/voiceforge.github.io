@@ -35,31 +35,7 @@ export class LogStore implements ILogger {
   // Timer state
   readonly startTime = signal<number | null>(null);
 
-  // Filter state
-  readonly filterLevel = signal<LogLevel | 'all'>('all');
-
   // ========== Computed Properties ==========
-
-  /**
-   * Get filtered entries based on filter level
-   */
-  readonly filtered = computed(() => {
-    const filter = this.filterLevel.value;
-    if (filter === 'all') return this.entries.value;
-    return this.entries.value.filter(e => e.level === filter);
-  });
-
-  /**
-   * Counts by level (single computed for all level counts)
-   */
-  readonly counts = computed(() => {
-    const entries = this.entries.value;
-    const counts = { error: 0, warn: 0, info: 0, debug: 0 };
-    for (const entry of entries) {
-      counts[entry.level]++;
-    }
-    return counts;
-  });
 
   /**
    * Check if there are any entries
@@ -70,22 +46,6 @@ export class LogStore implements ILogger {
    * Total entry count
    */
   readonly count = computed(() => this.entries.value.length);
-
-  // ========== Level Access Methods ==========
-
-  /**
-   * Get entries by level
-   */
-  getByLevel(level: LogLevel): LogEntry[] {
-    return this.entries.value.filter(e => e.level === level);
-  }
-
-  /**
-   * Get count by level
-   */
-  countByLevel(level: LogLevel): number {
-    return this.counts.value[level];
-  }
 
   // ========== Actions ==========
 
@@ -153,10 +113,10 @@ export class LogStore implements ILogger {
   }
 
   /**
-   * Add debug entry
+   * Add debug entry (console only - not stored)
    */
   debug(message: string, data?: Record<string, unknown>): void {
-    this.add('debug', message, data);
+    console.debug(`[DEBUG] ${message}`, data ?? '');
   }
 
   /**
@@ -164,13 +124,6 @@ export class LogStore implements ILogger {
    */
   clear(): void {
     this.entries.value = [];
-  }
-
-  /**
-   * Set filter level
-   */
-  setFilter(level: LogLevel | 'all'): void {
-    this.filterLevel.value = level;
   }
 
   /**
