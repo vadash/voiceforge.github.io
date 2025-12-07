@@ -235,7 +235,8 @@ export class LLMVoiceService {
       [],
       'merge',
       (attempt, delay, errors) => {
-        const reason = errors?.length ? `: ${errors[0]}` : '';
+        const errorCount = errors?.length || 0;
+        const reason = errorCount ? ` (${errorCount} errors): ${errors![errors!.length - 1]}` : '';
         onProgress?.(0, 0, `Merge validation failed${reason}, retry ${attempt} in ${Math.round(delay / 1000)}s...`);
       }
     );

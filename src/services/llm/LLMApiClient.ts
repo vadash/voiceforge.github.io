@@ -91,13 +91,14 @@ export class LLMApiClient {
           return response;
         }
 
-        // Validation failed - retry with errors in prompt
-        previousErrors = validation.errors;
+        // Validation failed - accumulate errors so LLM doesn't repeat mistakes
+        const newErrors = validation.errors.filter(e => !previousErrors.includes(e));
+        previousErrors = [...previousErrors, ...newErrors];
         const delay = getRetryDelay(attempt);
         attempt++;
 
-        this.logger?.info(`[${pass}] Validation failed, retry ${attempt}, waiting ${delay / 1000}s...`, { errors: validation.errors });
-        onRetry?.(attempt, delay, validation.errors);
+        this.logger?.info(`[${pass}] Validation failed, retry ${attempt}, waiting ${delay / 1000}s...`, { errors: previousErrors });
+        onRetry?.(attempt, delay, previousErrors);
         await this.sleep(delay);
       } catch (error) {
         if (signal?.aborted) {
