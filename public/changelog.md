@@ -1,8 +1,13 @@
 # Changelog
 
-All notable changes since the initial release.
+## v2 08/12/25
 
-## [Current] - 04/12/25
+LLM settings menu improved. Handles thinking/no thinking. Improved LLM response parsing.
+Edge TTS is much faster now.
+You can pick older version now. For example stable version will be "v1", beta "v2"
+Added optional DeEss. 
+
+## 04/12/25
 
 ### LLM Voice Assignment System
 - **Character Detection**: AI-powered extraction of characters from text
@@ -62,8 +67,8 @@ All notable changes since the initial release.
 
 ---
 
-## [Initial Release] - 58adbb7
+## [Initial Release]
 
 Basic TTS functionality with single voice output.
 
-https://edgetts.github.io/
+https://edgetts.github.io/ <3

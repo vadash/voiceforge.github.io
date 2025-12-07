@@ -26,16 +26,15 @@ A web application that converts text files to MP3/Opus audio using Microsoft Edg
 
 1. **Upload** - Drop a text file (TXT, FB2, EPUB) or paste text directly
 2. **Configure** - Select voice, speed, pitch in Settings
-3. **Optional: Enable LLM** - For multi-voice books, configure LLM API in Settings → LLM tab
+3. **Enable LLM** - For multi-voice books, configure LLM API in Settings → LLM tab
 4. **Convert** - Click "Save to MP3" and select output folder
 
-## LLM Setup (Optional)
+## LLM Setup (Required)
 
 For multi-voice audiobooks:
 1. Go to Settings → LLM tab
 2. Enable "LLM Voice Assignment"
 3. Enter API URL and API Key
-4. Recommended: Google AI Studio (free 1000 requests/day)
 
 See the "?" button in LLM settings for detailed free provider options.
 
