@@ -112,7 +112,7 @@ export function StatusPanel() {
       {/* Log entries - scrollable with colored lines */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-3 font-mono text-sm scrollbar-hide"
+        className="flex-1 overflow-y-auto p-3 font-mono text-sm"
         aria-label="Status log"
       >
         {entries.map((entry) => (
