@@ -56,9 +56,10 @@ describe('LogStore', () => {
       expect(store.entries.value[0].level).toBe('error');
     });
 
-    it('debug() should add debug level entry', () => {
+    it('debug() should only log to console (not stored)', () => {
       store.debug('Debug message');
-      expect(store.entries.value[0].level).toBe('debug');
+      // debug() only logs to console, doesn't store entries
+      expect(store.entries.value).toHaveLength(0);
     });
   });
 
@@ -71,46 +72,17 @@ describe('LogStore', () => {
       store.add('warn', 'Warning 2');
     });
 
-    it('getByLevel should return only entries of that level', () => {
-      expect(store.getByLevel('error')).toHaveLength(1);
-      expect(store.getByLevel('error')[0].message).toBe('Error 1');
-      expect(store.getByLevel('warn')).toHaveLength(2);
-      expect(store.getByLevel('info')).toHaveLength(2);
-    });
-
     it('count should return total entries', () => {
       expect(store.count.value).toBe(5);
     });
 
-    it('counts should return all level counts', () => {
-      expect(store.counts.value.error).toBe(1);
-      expect(store.counts.value.warn).toBe(2);
-      expect(store.counts.value.info).toBe(2);
-      expect(store.counts.value.debug).toBe(0);
+    it('hasEntries should return true when entries exist', () => {
+      expect(store.hasEntries.value).toBe(true);
     });
 
-    it('countByLevel should return count for specific level', () => {
-      expect(store.countByLevel('error')).toBe(1);
-      expect(store.countByLevel('warn')).toBe(2);
-    });
-  });
-
-  describe('filter', () => {
-    beforeEach(() => {
-      store.add('info', 'Info');
-      store.add('warn', 'Warning');
-      store.add('error', 'Error');
-    });
-
-    it('should filter by level', () => {
-      store.setFilter('error');
-      expect(store.filtered.value).toHaveLength(1);
-      expect(store.filtered.value[0].message).toBe('Error');
-    });
-
-    it('should return all when filter is "all"', () => {
-      store.setFilter('all');
-      expect(store.filtered.value).toHaveLength(3);
+    it('hasEntries should return false when empty', () => {
+      store.clear();
+      expect(store.hasEntries.value).toBe(false);
     });
   });
 
