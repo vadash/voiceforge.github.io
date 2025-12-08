@@ -190,7 +190,7 @@ export class LLMApiClient {
 
     // Make API call
     let content = '';
-    this.logger?.info(`[${pass}] API call starting...`);
+    this.logger?.info(`[${pass}] API call starting... temp=${requestBody.temperature ?? '-'} top_p=${requestBody.top_p ?? '-'} reasoning=${requestBody.reasoning_effort ?? '-'}`);
 
     if (requestBody.stream) {
       const stream = await this.client.chat.completions.create(requestBody as OpenAI.ChatCompletionCreateParamsStreaming, { signal });
