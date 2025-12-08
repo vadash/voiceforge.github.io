@@ -27,61 +27,8 @@ export interface TestFixture {
  */
 export const fixtures: TestFixture[] = [
   {
-    name: "Sample 1 - Vinland Majesty",
-    file: "sample1.txt",
-    expectedCharacters: [
-      { name: "Fielding", gender: "male" },
-      { name: "Tennyson", gender: "male" },
-    ],
-    expectedDialogueLines: [
-      { textContains: "Alan, I'm so sorry", speaker: "Tennyson", strict: false },
-      { textContains: "I'll get them", speaker: "Fielding", strict: false },
-      { textContains: "Leave it to the authorities", speaker: "Tennyson", strict: false },
-      { textContains: "There are no bloody authorities", speaker: "Fielding", strict: false },
-      { textContains: "It could still be some kind of private estate", speaker: "Tennyson", strict: false },
-      { textContains: "On the coast", speaker: "Fielding", strict: false },
-      { textContains: "Willard thinks we've gone back in time", speaker: "Fielding", strict: false },
-      { textContains: "We can put the hows and whys", speaker: "Tennyson", strict: false },
-      { textContains: "I'll be there", speaker: "Fielding", strict: false },
-      { textContains: "Sure", speaker: "Conrad", strict: false },
-      { textContains: "Make sure those two are at the meeting", speaker: "Tennyson", strict: false },
-      { textContains: "Do they have any experience", speaker: "Fielding", strict: false },
-      { textContains: "Alan, I know how you feel", speaker: "Tennyson", strict: false },
-      { textContains: "No you bloody don't", speaker: "Fielding", strict: false },
-      { textContains: "I don't intend to leave it up to chance", speaker: "Fielding", strict: false },
-      { textContains: "I can't condone murder", speaker: "Tennyson", strict: false },
-      { textContains: "I'm going, Dave", speaker: "Fielding", strict: false },
-      { textContains: "If necessary", speaker: "Tennyson", strict: false },
-      { textContains: "I don't intend to find out", speaker: "Fielding", strict: false },
-      { textContains: "And we bring them back alive", speaker: "Tennyson", strict: false },
-      { textContains: "That's down to them", speaker: "Fielding", strict: false },
-      { textContains: "go get some rest", speaker: "Tennyson", strict: false },
-    ],
-  },
-  {
-    name: "Sample 2 - Russian Dialogue",
-    file: "sample2.txt",
-    expectedCharacters: [
-      { name: "Мартин", gender: "male" },
-      { name: "Женька", gender: "male" },
-    ],
-    expectedDialogueLines: [
-      { textContains: "Март, чем ты сейчас занимаешься", speaker: "Женька", strict: false },
-      { textContains: "Всякой фигней", speaker: "Мартин", strict: false },
-      { textContains: "Ты ведешь какое-то серьезное дело", speaker: "Женька", strict: false },
-      { textContains: "Заканчиваю", speaker: "Мартин", strict: false },
-      { textContains: "А что осталось не законченным", speaker: "Женька", strict: false },
-      { textContains: "Девочка кое-что успела мне сообщить", speaker: "Мартин", strict: false },
-      { textContains: "Меня расспрашивали о тебе", speaker: "Женька", strict: false },
-      { textContains: "Мент", speaker: "Мартин", strict: false },
-      { textContains: "Госбезопасность", speaker: "Женька", strict: false },
-      { textContains: "Да что им от меня надо", speaker: "Мартин", strict: false },
-      { textContains: "Вот уж не знаю", speaker: "Женька", strict: false },
-    ],
-  },
-  {
-    name: "Sample 3 - Mirian and Lily",
-    file: "sample3.txt",
+    name: "sample_1_en_simple",
+    file: "sample_1_en_simple.txt",
     expectedCharacters: [
       { name: "Mirian", gender: "female" },
       { name: "Lily", gender: "female" },
@@ -97,6 +44,45 @@ export const fixtures: TestFixture[] = [
       { textContains: "Yes", speaker: "Mirian", strict: false },
     ],
   },
+  {
+    name: 'sample_2_ru_hard',
+    file: 'sample_2_ru_hard.txt',
+    expectedCharacters: [
+      { name: 'Звягин', gender: 'male' },
+      { name: 'Епишко', gender: 'male' },
+    ],
+    expectedDialogueLines: [
+      // Scene 13: Lottery & New Job
+      { textContains: 'Чего рожа кислая?', speaker: 'Звягин', strict: true },
+      { textContains: 'Проверял… это старый', speaker: 'Епишко', strict: true },
+      { textContains: 'Впервые в жизни', speaker: 'Епишко', strict: true },
+      { textContains: 'Ты никогда ничего не теряешь', speaker: 'Жена', strict: false },
+      { textContains: 'Я его постирал', speaker: 'Епишко', strict: true },
+      { textContains: 'Откуда деньги-то?', speaker: 'Епишко', strict: true },
+      { textContains: 'А почему не заработаешь?', speaker: 'Звягин', strict: true },
+      { textContains: 'Прирабатываю', speaker: 'Епишко', strict: true },
+
+      // Scene 14: The Forest
+      { textContains: 'Нож? Спички? Компас? Пошли…', speaker: 'Звягин', strict: true },
+      { textContains: 'Э-ге-геээ!', speaker: 'Епишко', strict: true },
+      { textContains: 'Умница, мальчик', speaker: 'Епишко', strict: true },
+      { textContains: 'Я зде-еесь!', speaker: 'Епишко', strict: true },
+      { textContains: 'Ты где был-то? Я уж тут и сам почти заблудился', speaker: 'Звягин', strict: true },
+      { textContains: 'Сучком поцарапал', speaker: 'Епишко', strict: true },
+      { textContains: 'Смеяться не надо', speaker: 'Епишко', strict: true },
+      { textContains: 'У вас легкая рука', speaker: 'Епишко', strict: true },
+
+      // Scene 15: Final Outcome
+      { textContains: 'Хочу лично посоветоваться', speaker: 'Епишко', strict: true },
+      { textContains: 'Да я уж начал подыскивать', speaker: 'Епишко', strict: true },
+      { textContains: 'Оденешься как следует', speaker: 'Звягин', strict: true },
+      { textContains: 'Зачем ты ему проиграл?', speaker: 'Дочь', strict: false },
+      { textContains: 'Кто я?', speaker: 'Звягин', strict: true },
+      { textContains: 'Врач', speaker: 'Дочь', strict: false },
+      { textContains: 'Стоит ли вкалывать', speaker: 'Звягин', strict: true },
+      { textContains: 'Ты у меня ужасный хвастун', speaker: 'Дочь', strict: false },
+    ],
+  },  
 ];
 
 /**
