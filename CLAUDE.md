@@ -48,7 +48,7 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 Optional multi-voice audiobooks using LLM-based character detection:
 
 - **Three-pass system**: Extract → Merge → Assign
-- **3-Way Voting** (optional): Calls LLM 3x with temps 0.0, 0.2, 0.4 for Assign step, uses majority vote (tiebreaker: 0.0). Debug logs disagreements to console.
+- **3-Way Voting** (optional): Calls LLM 3x with different temps for Assign step, uses majority vote (tiebreaker: 0.0). Debug logs disagreements to console.
 - Uses sparse output format with character codes (A-Z, 0-9, a-z) for token reduction
 - Infinite retry with exponential backoff
 - Logs to: `logs/extract_*.json`, `logs/merge_*.json`, `logs/assign_*.json`

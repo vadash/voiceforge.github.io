@@ -169,7 +169,7 @@ export function LLMTab() {
           checked={llm.useVoting.value}
           onChange={(v) => llm.setUseVoting(v)}
           label="3-Way Voting"
-          title="Calls LLM 3x with temperatures 0.0, 0.2, 0.4 and uses majority vote for speaker assignment"
+          title="Calls LLM 3x with different temperatures and uses majority vote for speaker assignment"
           disabled={isReasoningEnabled}
         />
 

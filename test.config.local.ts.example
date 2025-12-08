@@ -6,5 +6,5 @@ export const testConfig = {
   streaming: true,       // Use streaming API
   temperature: 0.1,      // LLM temperature (0.0-1.0)
   topP: 1.0,             // Top-p sampling
-  useVoting: false,      // 3-way voting for Assign step (temps 0.0, 0.2, 0.4)
+  useVoting: false,      // 3-way voting for Assign step
 };

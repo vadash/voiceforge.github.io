@@ -66,7 +66,7 @@ export const hasSpeechSymbols = (text: string): boolean => {
 /**
  * Voting temperatures for 3-way voting
  */
-const VOTING_TEMPERATURES = [0.0, 0.2, 0.4] as const;
+const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
 
 /**
  * Majority vote helper for 3-way voting.
