@@ -39,13 +39,14 @@ export function validateExtractResponse(response: string): LLMValidationResult {
   return { valid: errors.length === 0, errors };
 }
 
-// Maximum number of missing characters to tolerate before failing validation
-const MAX_MISSING_CHARACTERS_TOLERANCE = 3;
+// Calculate max missing characters tolerance: 10% of total, min 4, max 10
+const getMaxMissingCharactersTolerance = (totalChars: number): number =>
+  Math.max(4, Math.min(10, Math.round(totalChars * 0.1)));
 
 /**
  * Validate Merge response (character deduplication)
  * Uses fuzzy matching: accepts variations as valid keep/absorb values
- * Tolerates up to MAX_MISSING_CHARACTERS_TOLERANCE missing characters (they'll be auto-added)
+ * Tolerates missing characters (10% of total, min 4, max 10) - they'll be auto-added
  */
 export function validateMergeResponse(response: string, characters: LLMCharacter[]): LLMValidationResult {
   const errors: string[] = [];
@@ -138,7 +139,7 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
     }
 
     // Only fail if too many characters are missing
-    if (missingCharacters.length > MAX_MISSING_CHARACTERS_TOLERANCE) {
+    if (missingCharacters.length > getMaxMissingCharactersTolerance(characters.length)) {
       for (const name of missingCharacters) {
         errors.push(`Character "${name}" not found in merges or unchanged`);
       }
