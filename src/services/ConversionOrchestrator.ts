@@ -186,6 +186,7 @@ export class ConversionOrchestrator {
 
       case StepNames.AUDIO_MERGE:
         this.stores.conversion.setStatus('merging');
+        this.stores.conversion.updateProgress(progress.current, progress.total);
         break;
 
       case StepNames.SAVE:

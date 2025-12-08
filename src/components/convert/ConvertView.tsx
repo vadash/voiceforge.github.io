@@ -30,7 +30,7 @@ export function ConvertView() {
       </div>
 
       {/* Right Panel - Status (Desktop only, hidden on mobile - use Logs tab) */}
-      <div className="hidden md:flex w-80 lg:w-96 flex-shrink-0">
+      <div className="hidden md:flex w-80 lg:w-96 flex-shrink-0 min-h-0">
         <StatusPanel />
       </div>
     </div>
