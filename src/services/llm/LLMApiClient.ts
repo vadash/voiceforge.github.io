@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import type { ChatCompletionCreateParamsStreaming, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import { jsonrepair } from 'jsonrepair';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay } from '@/config';
@@ -168,44 +167,17 @@ export class LLMApiClient {
       this.saveLog('assign_request.json', requestBody);
     }
 
-    // Make API call - handle both streaming and non-streaming modes
+    // Make API call
     let content = '';
     this.logger?.info(`[${pass}] API call starting...`);
-    const isStreaming = this.options.streaming !== false;
 
-    if (isStreaming) {
-      // Streaming mode - use explicit type to help TypeScript
-      const streamParams: ChatCompletionCreateParamsStreaming = {
-        model: requestBody.model,
-        messages: requestBody.messages,
-        stream: true,
-      };
-      // Add optional parameters
-      if (requestBody.reasoning_effort) (streamParams as any).reasoning_effort = requestBody.reasoning_effort;
-      if (requestBody.max_completion_tokens) streamParams.max_completion_tokens = requestBody.max_completion_tokens;
-      if (requestBody.max_tokens) streamParams.max_tokens = requestBody.max_tokens;
-      if (requestBody.temperature !== undefined) streamParams.temperature = requestBody.temperature;
-      if (requestBody.top_p !== undefined) streamParams.top_p = requestBody.top_p;
-
-      const stream = await this.client.chat.completions.create(streamParams, { signal });
+    if (requestBody.stream) {
+      const stream = await this.client.chat.completions.create(requestBody as OpenAI.ChatCompletionCreateParamsStreaming, { signal });
       for await (const chunk of stream) {
         content += chunk.choices[0]?.delta?.content || '';
       }
     } else {
-      // Non-streaming mode - use explicit type to help TypeScript
-      const nonStreamParams: ChatCompletionCreateParamsNonStreaming = {
-        model: requestBody.model,
-        messages: requestBody.messages,
-        stream: false,
-      };
-      // Add optional parameters
-      if (requestBody.reasoning_effort) (nonStreamParams as any).reasoning_effort = requestBody.reasoning_effort;
-      if (requestBody.max_completion_tokens) nonStreamParams.max_completion_tokens = requestBody.max_completion_tokens;
-      if (requestBody.max_tokens) nonStreamParams.max_tokens = requestBody.max_tokens;
-      if (requestBody.temperature !== undefined) nonStreamParams.temperature = requestBody.temperature;
-      if (requestBody.top_p !== undefined) nonStreamParams.top_p = requestBody.top_p;
-
-      const response = await this.client.chat.completions.create(nonStreamParams, { signal });
+      const response = await this.client.chat.completions.create(requestBody as OpenAI.ChatCompletionCreateParamsNonStreaming, { signal });
       content = response.choices[0]?.message?.content || '';
     }
 
