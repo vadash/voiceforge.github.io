@@ -24,6 +24,27 @@ export interface LLMPrompt {
 }
 
 /**
+ * Detect provider from API URL or model name
+ */
+function detectProvider(apiUrl: string, model: string): 'mistral' | 'openai' | 'unknown' {
+  const lower = `${apiUrl} ${model}`.toLowerCase();
+  if (lower.includes('mistral')) return 'mistral';
+  if (lower.includes('openai')) return 'openai';
+  return 'unknown';
+}
+
+/**
+ * Apply provider-specific fixes to request body
+ */
+function applyProviderFixes(requestBody: Record<string, unknown>, provider: string): void {
+  if (provider === 'mistral') {
+    // Mistral requires top_p=1 when temperature=0 (greedy sampling)
+    // Safest to just not send top_p at all
+    delete requestBody.top_p;
+  }
+}
+
+/**
  * LLMApiClient - Handles LLM API communication with retry logic
  */
 export class LLMApiClient {
@@ -33,10 +54,12 @@ export class LLMApiClient {
   private extractLogged = false;
   private mergeLogged = false;
   private assignLogged = false;
+  private provider: string;
 
   constructor(options: LLMApiClientOptions) {
     this.options = options;
     this.logger = options.logger;
+    this.provider = detectProvider(options.apiUrl, options.model);
 
     // Custom fetch that strips SDK headers (some proxies block them)
     const customFetch: typeof fetch = async (url, init) => {
@@ -157,6 +180,9 @@ export class LLMApiClient {
       requestBody.temperature = this.options.temperature ?? 0.0;
       requestBody.top_p = this.options.topP ?? 0.95;
     }
+
+    // Apply provider-specific fixes (e.g., Mistral doesn't allow top_p with temperature=0)
+    applyProviderFixes(requestBody, this.provider);
 
     // Save request log (first call only per pass type)
     if (pass === 'extract' && !this.extractLogged) {
