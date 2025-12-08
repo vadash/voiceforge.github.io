@@ -35,17 +35,6 @@ export function StatusPanel() {
     }
   }, [entries]);
 
-  // Calculate ETA
-  const getETA = useCallback(() => {
-    if (current === 0 || total === 0 || !conversion.startTime.value) return '';
-    const elapsed = Date.now() - conversion.startTime.value;
-    const rate = current / elapsed;
-    const remaining = (total - current) / rate;
-    const minutes = Math.floor(remaining / 60000);
-    const seconds = Math.floor((remaining % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }, [current, total, conversion.startTime.value]);
-
   // Actions
   const handleClear = useCallback(() => {
     logs.clear();
@@ -70,7 +59,7 @@ export function StatusPanel() {
     URL.revokeObjectURL(url);
   }, [logs]);
 
-  const eta = getETA();
+  const eta = conversion.estimatedTimeRemaining.value || '';
 
   return (
     <div className="flex flex-col h-full bg-primary-secondary rounded-lg border border-border overflow-hidden">

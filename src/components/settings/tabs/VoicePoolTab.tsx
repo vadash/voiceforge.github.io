@@ -4,15 +4,13 @@ import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import { useSettings } from '@/stores';
-import { useService, ServiceTypes } from '@/di';
-import type { IReusableTTSService } from '@/services/interfaces';
+import { useVoicePreview } from '@/hooks/useVoicePreview';
 
-const isPlaying = signal<string | null>(null);
 const sampleText = signal<string>('Hello, this is a sample of my voice.');
 
 export function VoicePoolTab() {
   const settings = useSettings();
-  const ttsService = useService<IReusableTTSService>(ServiceTypes.TTSPreviewService);
+  const preview = useVoicePreview();
   const [filter, setFilter] = useState('');
   const [localeFilter, setLocaleFilter] = useState('all');
 
@@ -68,40 +66,8 @@ export function VoicePoolTab() {
     settings.setEnabledVoices([]);
   };
 
-  const playVoice = async (voiceId: string) => {
-    if (isPlaying.value || !sampleText.value.trim()) return;
-    isPlaying.value = voiceId;
-
-    try {
-      // Use singleton TTS service to avoid rate limiting
-      const audioData = await ttsService.send({
-        text: sampleText.value,
-        config: {
-          voice: `Microsoft Server Speech Text to Speech Voice (${voiceId})`,
-          rate: '+0%',
-          pitch: '+0Hz',
-          volume: '+0%'
-        }
-      });
-
-      const blob = new Blob([(audioData.buffer as ArrayBuffer).slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength)], { type: 'audio/mpeg' });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        isPlaying.value = null;
-      };
-
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        isPlaying.value = null;
-      };
-
-      await audio.play();
-    } catch (e) {
-      isPlaying.value = null;
-    }
+  const playVoice = (voiceId: string) => {
+    preview.play(sampleText.value, voiceId);
   };
 
   const enabledCount = enabledVoices.value.size;
@@ -128,11 +94,11 @@ export function VoicePoolTab() {
           </select>
           <button
             onClick={() => playVoice(settings.narratorVoice.value)}
-            disabled={isPlaying.value !== null}
+            disabled={preview.isPlaying}
             className="btn btn-icon"
             aria-label="Play voice sample"
           >
-            {isPlaying.value === settings.narratorVoice.value ? '...' : '▶'}
+            {preview.isPlaying && preview.currentVoiceId === settings.narratorVoice.value ? '...' : '▶'}
           </button>
         </div>
       </div>
@@ -208,10 +174,10 @@ export function VoicePoolTab() {
             </div>
             <button
               onClick={() => playVoice(voice.fullValue)}
-              disabled={isPlaying.value !== null}
+              disabled={preview.isPlaying}
               className="btn btn-sm btn-icon"
             >
-              {isPlaying.value === voice.fullValue ? '...' : '▶'}
+              {preview.isPlaying && preview.currentVoiceId === voice.fullValue ? '...' : '▶'}
             </button>
           </div>
         ))}

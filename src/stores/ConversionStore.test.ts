@@ -287,6 +287,7 @@ describe('ConversionStore', () => {
       const startTime = 1000000;
       vi.spyOn(Date, 'now').mockReturnValue(startTime);
       store.startConversion();
+      store.setStatus('converting');
       store.updateProgress(0, 100);
 
       // Advance time by 10 seconds, complete 10 items
@@ -298,6 +299,43 @@ describe('ConversionStore', () => {
       expect(store.estimatedTimeRemaining.value).toBe('00:01:30');
 
       vi.restoreAllMocks();
+    });
+
+    it('uses heuristic for merging phase with no progress', () => {
+      const startTime = 1000000;
+      vi.spyOn(Date, 'now').mockReturnValue(startTime);
+      store.startConversion();
+      store.setStatus('merging'); // This sets mergeStartTime
+      store.updateProgress(0, 5);
+
+      // With 0 progress, uses 60s heuristic per item
+      // 5 items * 60s = 300s = 00:05:00
+      expect(store.estimatedTimeRemaining.value).toBe('00:05:00');
+
+      vi.restoreAllMocks();
+    });
+
+    it('calculates actual rate for merging phase with progress', () => {
+      const startTime = 1000000;
+      vi.spyOn(Date, 'now').mockReturnValue(startTime);
+      store.startConversion();
+      store.setStatus('merging'); // This sets mergeStartTime
+      store.updateProgress(0, 5);
+
+      // Advance time by 30 seconds, complete 1 item
+      vi.spyOn(Date, 'now').mockReturnValue(startTime + 30000);
+      store.updateProgress(1, 5);
+
+      // 1 item in 30 seconds = 30s/item
+      // 4 items remaining * 30s = 120s = 00:02:00
+      expect(store.estimatedTimeRemaining.value).toBe('00:02:00');
+
+      vi.restoreAllMocks();
+    });
+
+    it('returns null for idle status', () => {
+      store.updateProgress(10, 100);
+      expect(store.estimatedTimeRemaining.value).toBeNull();
     });
   });
 });

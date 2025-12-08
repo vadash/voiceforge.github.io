@@ -1,9 +1,8 @@
 import { signal, computed } from '@preact/signals';
 import { Text } from 'preact-i18n';
 import { useSettings, useData } from '../../stores';
-import { useLogger, useService, ServiceTypes } from '../../di';
+import { useVoicePreview } from '../../hooks/useVoicePreview';
 import voices from './voices';
-import type { IReusableTTSService } from '../../services/interfaces';
 
 const SAMPLE_PHRASES = [
   "The quick brown fox jumps over the lazy dog",
@@ -19,13 +18,11 @@ const SAMPLE_PHRASES = [
 ];
 
 const samplePhrase = signal<string>(SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]);
-const isPlaying = signal<boolean>(false);
 
 export function VoiceSelector() {
   const settings = useSettings();
   const data = useData();
-  const logger = useLogger();
-  const ttsService = useService<IReusableTTSService>(ServiceTypes.TTSPreviewService);
+  const preview = useVoicePreview();
 
   // Filter voices based on detected language
   const filteredVoices = computed(() => {
@@ -35,42 +32,12 @@ export function VoiceSelector() {
     );
   });
 
-  const playVoiceSample = async () => {
-    if (isPlaying.value || !samplePhrase.value.trim()) return;
-
-    isPlaying.value = true;
-
-    try {
-      // Use singleton TTS service to avoid rate limiting
-      const audioData = await ttsService.send({
-        text: samplePhrase.value,
-        config: {
-          voice: `Microsoft Server Speech Text to Speech Voice (${settings.narratorVoice.value})`,
-          rate: `${settings.rate.value >= 0 ? '+' : ''}${settings.rate.value}%`,
-          pitch: `${settings.pitch.value >= 0 ? '+' : ''}${settings.pitch.value}Hz`,
-          volume: '+0%'
-        }
-      });
-
-      const blob = new Blob([(audioData.buffer as ArrayBuffer).slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength)], { type: 'audio/mpeg' });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        isPlaying.value = false;
-      };
-
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        isPlaying.value = false;
-      };
-
-      await audio.play();
-    } catch (e) {
-      logger.error('Failed to play sample', e instanceof Error ? e : undefined);
-      isPlaying.value = false;
-    }
+  const playVoiceSample = () => {
+    preview.play(
+      samplePhrase.value,
+      settings.narratorVoice.value,
+      { rate: settings.rate.value, pitch: settings.pitch.value }
+    );
   };
 
   return (
@@ -94,11 +61,11 @@ export function VoiceSelector() {
         <button
           class="play-sample-btn"
           onClick={playVoiceSample}
-          disabled={isPlaying.value}
+          disabled={preview.isPlaying}
           aria-label="Play voice sample"
-          aria-busy={isPlaying.value}
+          aria-busy={preview.isPlaying}
         >
-          {isPlaying.value ? '...' : '▶'}
+          {preview.isPlaying ? '...' : '▶'}
         </button>
       </div>
       <input

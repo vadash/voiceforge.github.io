@@ -54,6 +54,7 @@ export class ConversionStore {
 
   // Timing
   readonly startTime = signal<number | null>(null);
+  readonly mergeStartTime = signal<number | null>(null);
 
   // Error state
   readonly error = signal<ConversionError | null>(null);
@@ -96,15 +97,40 @@ export class ConversionStore {
    */
   readonly estimatedTimeRemaining = computed(() => {
     const { current, total } = this.progress.value;
-    const start = this.startTime.value;
+    const status = this.status.value;
 
-    if (!start || current === 0 || total === 0) return null;
+    // 1. Merging Phase (uses separate timing to avoid skewed estimates)
+    if (status === 'merging') {
+      if (total === 0) return null;
+      const start = this.mergeStartTime.value;
+      if (!start) return null;
 
-    const elapsed = Date.now() - start;
-    const rate = elapsed / current;
-    const remaining = (total - current) * rate;
+      const remainingItems = total - current;
+      if (remainingItems <= 0) return '00:00:00';
 
-    return this.formatDuration(remaining);
+      // Heuristic: Default to 60s per block (approx 30min audio processing)
+      // If we have processed at least one item, calculate actual average
+      let timePerItem = 60000;
+
+      if (current > 0) {
+        const elapsed = Date.now() - start;
+        timePerItem = elapsed / current;
+      }
+
+      return this.formatDuration(remainingItems * timePerItem);
+    }
+
+    // 2. Conversion/Extraction Phase (standard logic)
+    if (status === 'converting' || status === 'llm-extract' || status === 'llm-assign') {
+      const start = this.startTime.value;
+      if (!start || current === 0 || total === 0) return null;
+      const elapsed = Date.now() - start;
+      const rate = elapsed / current;
+      const remaining = (total - current) * rate;
+      return this.formatDuration(remaining);
+    }
+
+    return null;
   });
 
   constructor() {
@@ -135,6 +161,9 @@ export class ConversionStore {
    */
   setStatus(status: ConversionStatus): void {
     this.status.value = status;
+    if (status === 'merging') {
+      this.mergeStartTime.value = Date.now();
+    }
   }
 
   /**
@@ -192,6 +221,7 @@ export class ConversionStore {
     this.status.value = 'idle';
     this.progress.value = { current: 0, total: 0 };
     this.startTime.value = null;
+    this.mergeStartTime.value = null;
     this.error.value = null;
   }
 
