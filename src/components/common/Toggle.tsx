@@ -3,11 +3,12 @@ interface ToggleProps {
   onChange: (checked: boolean) => void;
   label?: string;
   disabled?: boolean;
+  title?: string;
 }
 
-export function Toggle({ checked, onChange, label, disabled = false }: ToggleProps) {
+export function Toggle({ checked, onChange, label, disabled = false, title }: ToggleProps) {
   return (
-    <label className={`flex items-center gap-3 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+    <label className={`flex items-center gap-3 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} title={title}>
       <button
         type="button"
         role="switch"

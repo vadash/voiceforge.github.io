@@ -63,6 +63,34 @@ export const hasSpeechSymbols = (text: string): boolean => {
   return false;
 };
 
+/**
+ * Voting temperatures for 3-way voting
+ */
+const VOTING_TEMPERATURES = [0.0, 0.2, 0.4] as const;
+
+/**
+ * Majority vote helper for 3-way voting.
+ * Returns the code that appears at least 2 times, or first vote (temp 0.0) as tiebreaker.
+ */
+function majorityVote(
+  votes: (string | undefined)[],
+  paragraphIndex: number
+): string | undefined {
+  const counts = new Map<string, number>();
+  for (const v of votes) {
+    if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+
+  // Find majority (>=2 of 3)
+  for (const [code, count] of counts) {
+    if (count >= 2) return code;
+  }
+
+  // No majority - log debug and use 0.0 as tiebreaker
+  console.debug(`[Voting] No majority for paragraph ${paragraphIndex}: ${votes.join(', ')} → using ${votes[0]}`);
+  return votes[0];
+}
+
 export interface LLMVoiceServiceOptions {
   apiKey: string;
   apiUrl: string;
@@ -72,6 +100,7 @@ export interface LLMVoiceServiceOptions {
   reasoning?: 'auto' | 'high' | 'medium' | 'low';
   temperature?: number;
   topP?: number;
+  useVoting?: boolean;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
 }
@@ -255,16 +284,45 @@ export class LLMVoiceService {
       .map((s, i) => `[${i}] ${s}`)
       .join('\n');
 
-    const response = await this.apiClient.callWithRetry(
-      buildAssignPrompt(characters, nameToCode, numberedParagraphs, 0),
-      (result) => validateAssignResponse(result, block.sentences.length, codeToName),
-      this.abortController?.signal,
-      [],
-      'assign'
-    );
+    const prompt = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 0);
+    const validator = (result: string) => validateAssignResponse(result, block.sentences.length, codeToName);
 
-    // Parse response (0-based) and map back to absolute indices
-    const relativeMap = parseAssignResponse(response, codeToName);
+    let relativeMap: Map<number, string>;
+
+    if (this.options.useVoting) {
+      // 3-way voting with different temperatures
+      const votingClients = VOTING_TEMPERATURES.map(temp => new LLMApiClient({
+        ...this.options,
+        temperature: temp,
+      }));
+
+      const responses = await Promise.all(
+        votingClients.map(client =>
+          client.callWithRetry(prompt, validator, this.abortController?.signal, [], 'assign')
+        )
+      );
+
+      // Parse all responses
+      const parsedMaps = responses.map(r => parseAssignResponse(r, codeToName));
+
+      // Majority vote for each paragraph
+      relativeMap = new Map();
+      for (let i = 0; i < block.sentences.length; i++) {
+        const votes = parsedMaps.map(m => m.get(i));
+        const winner = majorityVote(votes, block.sentenceStartIndex + i);
+        if (winner) relativeMap.set(i, winner);
+      }
+    } else {
+      // Single call (original behavior)
+      const response = await this.apiClient.callWithRetry(
+        prompt,
+        validator,
+        this.abortController?.signal,
+        [],
+        'assign'
+      );
+      relativeMap = parseAssignResponse(response, codeToName);
+    }
 
     return block.sentences.map((text, i) => {
       const absoluteIndex = block.sentenceStartIndex + i;

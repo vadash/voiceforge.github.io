@@ -29,6 +29,7 @@ interface LLMSettings {
   reasoning: ReasoningLevel | null;
   temperature: number;
   topP: number;
+  useVoting: boolean;
 }
 
 /**
@@ -43,6 +44,7 @@ const defaultLLMSettings = {
   reasoning: null as ReasoningLevel | null,
   temperature: 0.0,
   topP: 0.95,
+  useVoting: false,
 };
 
 /**
@@ -60,6 +62,7 @@ export class LLMStore {
   readonly reasoning = signal<ReasoningLevel | null>(defaultLLMSettings.reasoning);
   readonly temperature = signal<number>(defaultLLMSettings.temperature);
   readonly topP = signal<number>(defaultLLMSettings.topP);
+  readonly useVoting = signal<boolean>(defaultLLMSettings.useVoting);
 
   // Processing state
   readonly processingStatus = signal<LLMProcessingStatus>('idle');
@@ -152,6 +155,11 @@ export class LLMStore {
     this.saveSettings();
   }
 
+  setUseVoting(value: boolean): void {
+    this.useVoting.value = value;
+    this.saveSettings();
+  }
+
   // ========== Processing State Actions ==========
 
   setProcessingStatus(status: LLMProcessingStatus): void {
@@ -237,6 +245,7 @@ export class LLMStore {
     this.reasoning.value = defaultLLMSettings.reasoning;
     this.temperature.value = defaultLLMSettings.temperature;
     this.topP.value = defaultLLMSettings.topP;
+    this.useVoting.value = defaultLLMSettings.useVoting;
   }
 
   // ========== Persistence ==========
@@ -256,6 +265,7 @@ export class LLMStore {
         reasoning: this.reasoning.value,
         temperature: this.temperature.value,
         topP: this.topP.value,
+        useVoting: this.useVoting.value,
       };
       localStorage.setItem(StorageKeys.llmSettings, JSON.stringify(settings));
     } catch (e) {
@@ -283,6 +293,7 @@ export class LLMStore {
         this.reasoning.value = settings.reasoning ?? defaultLLMSettings.reasoning;
         this.temperature.value = settings.temperature ?? defaultLLMSettings.temperature;
         this.topP.value = settings.topP ?? defaultLLMSettings.topP;
+        this.useVoting.value = settings.useVoting ?? defaultLLMSettings.useVoting;
       }
     } catch (e) {
       this.logStore.error(

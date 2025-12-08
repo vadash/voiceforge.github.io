@@ -87,6 +87,7 @@ export class ConversionOrchestrator {
         reasoning: this.stores.llm.reasoning.value ?? undefined,
         temperature: this.stores.llm.temperature.value,
         topP: this.stores.llm.topP.value,
+        useVoting: this.stores.llm.useVoting.value,
 
         // Data
         detectedLanguage: detectedLang,

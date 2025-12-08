@@ -50,6 +50,7 @@ export interface PipelineBuilderOptions {
   reasoning?: 'auto' | 'high' | 'medium' | 'low';
   temperature?: number;
   topP?: number;
+  useVoting?: boolean;
 
   // Data
   detectedLanguage: string;
@@ -107,6 +108,7 @@ export class PipelineBuilder implements IPipelineBuilder {
       reasoning: options.reasoning,
       temperature: options.temperature,
       topP: options.topP,
+      useVoting: options.useVoting,
       directoryHandle: options.directoryHandle,
       logger: this.logger,
     };

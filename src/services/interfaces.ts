@@ -397,6 +397,7 @@ export interface LLMServiceFactoryOptions {
   reasoning?: 'auto' | 'high' | 'medium' | 'low';
   temperature?: number;
   topP?: number;
+  useVoting?: boolean;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
 }
