@@ -65,6 +65,10 @@ export function createService(): LLMVoiceService {
     model: testConfig.model,
     narratorVoice: 'en-US-AriaNeural',
     reasoning: testConfig.reasoning ?? undefined,
+    streaming: testConfig.streaming ?? true,
+    temperature: testConfig.temperature,
+    topP: testConfig.topP,
+    useVoting: testConfig.useVoting,
     logger: testLogger,
   });
 }

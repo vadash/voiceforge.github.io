@@ -3,4 +3,8 @@ export const testConfig = {
   apiUrl: '',      // e.g., https://api.openai.com/v1
   model: '',       // e.g., gpt-4o-mini
   reasoning: null as 'auto' | 'high' | 'medium' | 'low' | null, // null = off, or 'low'/'medium'/'high'/'auto'
+  streaming: true,       // Use streaming API
+  temperature: 0.1,      // LLM temperature (0.0-1.0)
+  topP: 1.0,             // Top-p sampling
+  useVoting: false,      // 3-way voting for Assign step (temps 0.0, 0.2, 0.4)
 };
