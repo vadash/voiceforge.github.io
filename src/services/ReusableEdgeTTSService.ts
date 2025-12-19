@@ -379,7 +379,6 @@ export class ReusableEdgeTTSService {
 
   private generateSecMsGec(): string {
     let ticks = Date.now() / 1000;
-    ticks -= 30 + Math.floor(Math.random() * 61);
     ticks += WIN_EPOCH;
     ticks -= ticks % 300;
     ticks *= S_TO_NS / 100;
