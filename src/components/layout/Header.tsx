@@ -15,9 +15,9 @@ export function Header() {
     <header className="bg-primary-secondary border-b border-border px-4 py-3">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo / Title */}
-        <h1 className="text-lg font-semibold text-white">
+        <a href="../" className="text-lg font-semibold text-white hover:text-gray-300 transition-colors">
           Edge TTS
-        </h1>
+        </a>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
