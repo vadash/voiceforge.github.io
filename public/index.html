@@ -7,6 +7,20 @@
   <title>Edge TTS</title>
 </head>
 <body>
+  <noscript>
+    <p style="color: #f59e0b; background: #1e1e1e; padding: 12px; text-align: center; font-family: system-ui;">
+      ⚠️ This app requires Microsoft Edge browser for TTS functionality. Chrome and other browsers are not supported.
+    </p>
+  </noscript>
   <div id="root"></div>
+  <script>
+    if (!navigator.userAgent.includes('Edg/')) {
+      document.body.insertAdjacentHTML('afterbegin',
+        '<p style="color: #f59e0b; background: #1e1e1e; padding: 12px; text-align: center; font-family: system-ui; margin: 0;">' +
+        '⚠️ This app requires Microsoft Edge browser for TTS functionality. Chrome and other browsers are not supported.' +
+        '</p>'
+      );
+    }
+  </script>
 </body>
 </html>
