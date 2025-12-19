@@ -6,6 +6,110 @@ import voices from '@/components/VoiceSelector/voices';
 import { useSettings } from '@/stores';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 
+// Language code to full name mapping
+const LANGUAGE_NAMES: Record<string, string> = {
+  'multilingual': 'Multilingual',
+  'en': 'English',
+  'ru': 'Russian',
+  'es': 'Spanish',
+  'zh': 'Chinese',
+  'fr': 'French',
+  'de': 'German',
+  'pt': 'Portuguese',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'it': 'Italian',
+  'ar': 'Arabic',
+  'hi': 'Hindi',
+  'tr': 'Turkish',
+  'pl': 'Polish',
+  'nl': 'Dutch',
+  'vi': 'Vietnamese',
+  'th': 'Thai',
+  'id': 'Indonesian',
+  'uk': 'Ukrainian',
+  'cs': 'Czech',
+  'sv': 'Swedish',
+  'da': 'Danish',
+  'fi': 'Finnish',
+  'nb': 'Norwegian',
+  'he': 'Hebrew',
+  'el': 'Greek',
+  'ro': 'Romanian',
+  'hu': 'Hungarian',
+  'sk': 'Slovak',
+  'bg': 'Bulgarian',
+  'hr': 'Croatian',
+  'sl': 'Slovenian',
+  'sr': 'Serbian',
+  'lt': 'Lithuanian',
+  'lv': 'Latvian',
+  'et': 'Estonian',
+  'ms': 'Malay',
+  'fil': 'Filipino',
+  'ta': 'Tamil',
+  'te': 'Telugu',
+  'bn': 'Bengali',
+  'gu': 'Gujarati',
+  'kn': 'Kannada',
+  'ml': 'Malayalam',
+  'mr': 'Marathi',
+  'ur': 'Urdu',
+  'fa': 'Persian',
+  'af': 'Afrikaans',
+  'am': 'Amharic',
+  'az': 'Azerbaijani',
+  'bs': 'Bosnian',
+  'ca': 'Catalan',
+  'cy': 'Welsh',
+  'ga': 'Irish',
+  'gl': 'Galician',
+  'is': 'Icelandic',
+  'iu': 'Inuktitut',
+  'jv': 'Javanese',
+  'ka': 'Georgian',
+  'kk': 'Kazakh',
+  'km': 'Khmer',
+  'lo': 'Lao',
+  'mk': 'Macedonian',
+  'mn': 'Mongolian',
+  'mt': 'Maltese',
+  'my': 'Burmese',
+  'ne': 'Nepali',
+  'ps': 'Pashto',
+  'si': 'Sinhala',
+  'so': 'Somali',
+  'sq': 'Albanian',
+  'su': 'Sundanese',
+  'sw': 'Swahili',
+  'uz': 'Uzbek',
+  'zu': 'Zulu',
+};
+
+// Priority order for languages (most popular first)
+const LANGUAGE_ORDER = [
+  'multilingual',
+  'en',
+  'ru',
+  'es',
+  'zh',
+  'fr',
+  'de',
+  'pt',
+  'ja',
+  'ko',
+  'it',
+  'ar',
+  'hi',
+  'tr',
+  'pl',
+  'nl',
+  'vi',
+  'th',
+  'id',
+  'uk',
+];
+
 const sampleText = signal<string>('Hello, this is a sample of my voice.');
 
 export function VoicePoolTab() {
@@ -23,10 +127,28 @@ export function VoicePoolTab() {
     return new Set(saved);
   });
 
-  // Get unique locales
+  // Get unique locales with multilingual category and custom sorting
   const locales = useMemo(() => {
     const unique = new Set(voices.map(v => v.locale.split('-')[0]));
-    return Array.from(unique).sort();
+    // Add multilingual category if there are multilingual voices
+    const hasMultilingual = voices.some(v => v.name.includes('Multilingual'));
+    if (hasMultilingual) {
+      unique.add('multilingual');
+    }
+
+    return Array.from(unique).sort((a, b) => {
+      const aIndex = LANGUAGE_ORDER.indexOf(a);
+      const bIndex = LANGUAGE_ORDER.indexOf(b);
+      // If both in priority list, use priority order
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+      // If only one in priority list, it comes first
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      // Otherwise sort alphabetically by full name
+      const aName = LANGUAGE_NAMES[a] || a.toUpperCase();
+      const bName = LANGUAGE_NAMES[b] || b.toUpperCase();
+      return aName.localeCompare(bName);
+    });
   }, []);
 
   // Filter voices for narrator selection based on detected language
@@ -42,8 +164,15 @@ export function VoicePoolTab() {
       const matchesSearch = filter === '' ||
         v.fullValue.toLowerCase().includes(filter.toLowerCase()) ||
         v.name.toLowerCase().includes(filter.toLowerCase());
-      const matchesLocale = localeFilter === 'all' ||
-        v.locale.startsWith(localeFilter);
+
+      let matchesLocale = localeFilter === 'all';
+      if (localeFilter === 'multilingual') {
+        matchesLocale = v.name.includes('Multilingual');
+      } else if (localeFilter !== 'all') {
+        // For regular locales, exclude multilingual voices
+        matchesLocale = v.locale.startsWith(localeFilter) && !v.name.includes('Multilingual');
+      }
+
       return matchesSearch && matchesLocale;
     });
   }, [filter, localeFilter]);
@@ -129,7 +258,7 @@ export function VoicePoolTab() {
         >
           <option value="all">All</option>
           {locales.map(locale => (
-            <option key={locale} value={locale}>{locale.toUpperCase()}</option>
+            <option key={locale} value={locale}>{LANGUAGE_NAMES[locale] || locale.toUpperCase()}</option>
           ))}
         </select>
         <input
