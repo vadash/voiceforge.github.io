@@ -50,6 +50,8 @@ export interface LLMConfig {
   maxConcurrentRequests: number;
   /** Maximum tokens for API response */
   maxTokens: number;
+  /** Maximum retries for assign blocks before fallback to default voice */
+  maxAssignRetries: number;
 }
 
 export interface RetryConfig {
@@ -123,6 +125,7 @@ export const defaultConfig: AppConfig = {
     assignBlockTokens: 8000,
     maxConcurrentRequests: 3,
     maxTokens: 4000,
+    maxAssignRetries: 3,
   },
 
   retry: {

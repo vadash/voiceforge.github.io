@@ -132,7 +132,9 @@ export class LLMApiClient {
   }
 
   /**
-   * Call LLM API with infinite retry and exponential backoff
+   * Call LLM API with retry and exponential backoff
+   * @param maxRetries - Maximum retries before giving up. Undefined = infinite retries.
+   * @returns Response string, or null if maxRetries exceeded
    */
   async callWithRetry(
     prompt: LLMPrompt,
@@ -140,11 +142,12 @@ export class LLMApiClient {
     signal?: AbortSignal,
     previousErrors: string[] = [],
     pass: PassType = 'extract',
-    onRetry?: (attempt: number, delay: number, errors?: string[]) => void
-  ): Promise<string> {
+    onRetry?: (attempt: number, delay: number, errors?: string[]) => void,
+    maxRetries?: number
+  ): Promise<string | null> {
     let attempt = 0;
 
-    while (true) {
+    while (maxRetries === undefined || attempt <= maxRetries) {
       try {
         const response = await this.call(prompt, signal, previousErrors, pass);
         const validation = validate(response);
@@ -156,6 +159,13 @@ export class LLMApiClient {
         // Validation failed - accumulate errors so LLM doesn't repeat mistakes
         const newErrors = validation.errors.filter(e => !previousErrors.includes(e));
         previousErrors = [...previousErrors, ...newErrors];
+
+        // Check if we've exceeded max retries
+        if (maxRetries !== undefined && attempt >= maxRetries) {
+          this.logger?.warn(`[${pass}] Max retries (${maxRetries}) exceeded, giving up`, { errors: previousErrors });
+          return null;
+        }
+
         const delay = getRetryDelay(attempt);
         attempt++;
 
@@ -167,6 +177,12 @@ export class LLMApiClient {
           throw new Error('Operation cancelled');
         }
 
+        // Check if we've exceeded max retries
+        if (maxRetries !== undefined && attempt >= maxRetries) {
+          this.logger?.error(`[${pass}] Max retries (${maxRetries}) exceeded after error`, error instanceof Error ? error : new Error(String(error)));
+          return null;
+        }
+
         const delay = getRetryDelay(attempt);
         attempt++;
         this.logger?.error(`[${pass}] API error, retry ${attempt}, waiting ${delay / 1000}s...`, error instanceof Error ? error : new Error(String(error)));
@@ -174,6 +190,8 @@ export class LLMApiClient {
         await this.sleep(delay);
       }
     }
+
+    return null;
   }
 
   /**

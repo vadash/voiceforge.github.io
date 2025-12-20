@@ -178,6 +178,11 @@ export class LLMVoiceService {
         'extract'
       );
 
+      // With infinite retries, this should never be null
+      if (response === null) {
+        throw new Error('Extract failed unexpectedly');
+      }
+
       const parsed = JSON.parse(response) as ExtractResponse;
       allCharacters.push(...parsed.characters);
 
@@ -294,24 +299,43 @@ export class LLMVoiceService {
 
     if (this.options.useVoting) {
       // 3-way voting with different temperatures (sequential with delays)
-      const responses: string[] = [];
+      const responses: (string | null)[] = [];
       for (let i = 0; i < VOTING_TEMPERATURES.length; i++) {
         const client = new LLMApiClient({
           ...this.options,
           temperature: VOTING_TEMPERATURES[i],
         });
-        responses.push(
-          await client.callWithRetry(prompt, validator, this.abortController?.signal, [], 'assign')
+        const response = await client.callWithRetry(
+          prompt,
+          validator,
+          this.abortController?.signal,
+          [],
+          'assign',
+          undefined,
+          defaultConfig.llm.maxAssignRetries
         );
+        responses.push(response);
         if (i < VOTING_TEMPERATURES.length - 1) {
           await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
         }
       }
 
-      // Parse all responses
-      const parsedMaps = responses.map(r => parseAssignResponse(r, codeToName));
+      // Check if all voting attempts failed - fall back to narrator
+      const validResponses = responses.filter((r): r is string => r !== null);
+      if (validResponses.length === 0) {
+        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after max retries (all voting attempts), using default voice for ${block.sentences.length} sentences`);
+        return block.sentences.map((text, i) => ({
+          sentenceIndex: block.sentenceStartIndex + i,
+          text,
+          speaker: 'narrator',
+          voiceId: this.options.narratorVoice,
+        }));
+      }
 
-      // Majority vote for each paragraph
+      // Parse valid responses only
+      const parsedMaps = validResponses.map(r => parseAssignResponse(r, codeToName));
+
+      // Majority vote for each paragraph (use available responses)
       relativeMap = new Map();
       for (let i = 0; i < block.sentences.length; i++) {
         const votes = parsedMaps.map(m => m.get(i));
@@ -325,8 +349,22 @@ export class LLMVoiceService {
         validator,
         this.abortController?.signal,
         [],
-        'assign'
+        'assign',
+        undefined,
+        defaultConfig.llm.maxAssignRetries
       );
+
+      // Handle max retries exceeded - fall back to narrator
+      if (response === null) {
+        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after max retries, using default voice for ${block.sentences.length} sentences`);
+        return block.sentences.map((text, i) => ({
+          sentenceIndex: block.sentenceStartIndex + i,
+          text,
+          speaker: 'narrator',
+          voiceId: this.options.narratorVoice,
+        }));
+      }
+
       relativeMap = parseAssignResponse(response, codeToName);
     }
 
@@ -366,6 +404,11 @@ export class LLMVoiceService {
         onProgress?.(0, 0, `Merge validation failed${reason}, retry ${attempt} in ${Math.round(delay / 1000)}s...`);
       }
     );
+
+    // With infinite retries, this should never be null
+    if (response === null) {
+      throw new Error('Merge failed unexpectedly');
+    }
 
     // Fix response by auto-adding any missing characters to unchanged list
     const fixedResponse = fixMergeResponse(response, characters);
