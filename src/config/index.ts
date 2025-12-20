@@ -132,9 +132,9 @@ export const defaultConfig: AppConfig = {
     extractBlockTokens: 16000,
     assignBlockTokens: 8000,
     maxConcurrentRequests: 3,
-    maxTokens: 4000,
+    maxTokens: 8000,
     maxAssignRetries: 3,
-    mergeChunkSize: 100,
+    mergeChunkSize: 50,
     mergeChunkThreshold: 150,
     mergeMaxIterations: 5,
     mergeMinReductionPercent: 5,
@@ -142,7 +142,7 @@ export const defaultConfig: AppConfig = {
 
   retry: {
     // Shared retry delays for TTS and LLM - stays on last value forever
-    delays: [10000, 20000, 50000, 100000, 300000, 600000],
+    delays: [5000, 10000, 20000, 40000, 60000, 120000],
   },
 
   ffmpeg: {

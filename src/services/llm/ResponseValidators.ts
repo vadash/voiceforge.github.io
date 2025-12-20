@@ -77,9 +77,29 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
       return { valid: false, errors };
     }
 
+    // Auto-fix missing unchanged array: compute from input chars minus merged ones
     if (!parsed.unchanged || !Array.isArray(parsed.unchanged)) {
-      errors.push('Response must have an "unchanged" array');
-      return { valid: false, errors };
+      parsed.unchanged = [];
+      // Collect all names used in merges
+      const mergedNames = new Set<string>();
+      for (const merge of parsed.merges) {
+        if (merge.keep) {
+          const resolved = resolveName(merge.keep);
+          if (resolved) mergedNames.add(resolved);
+        }
+        if (Array.isArray(merge.absorb)) {
+          for (const name of merge.absorb) {
+            const resolved = resolveName(name);
+            if (resolved) mergedNames.add(resolved);
+          }
+        }
+      }
+      // Add unmerged characters to unchanged
+      for (const char of characters) {
+        if (!mergedNames.has(char.canonicalName)) {
+          parsed.unchanged.push(char.canonicalName);
+        }
+      }
     }
 
     // Validate merges
@@ -154,6 +174,7 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
 
 /**
  * Fix merge response by auto-adding missing characters to unchanged list
+ * Also creates unchanged array if missing
  * Call this after validation passes to ensure all characters are accounted for
  */
 export function fixMergeResponse(response: string, characters: LLMCharacter[]): string {
@@ -176,6 +197,11 @@ export function fixMergeResponse(response: string, characters: LLMCharacter[]): 
       if (validNames.has(name)) return name;
       return variationToCanonical.get(name.toLowerCase()) ?? null;
     };
+
+    // Ensure unchanged array exists
+    if (!parsed.unchanged || !Array.isArray(parsed.unchanged)) {
+      parsed.unchanged = [];
+    }
 
     // Find all used names
     const usedNames = new Set<string>();
