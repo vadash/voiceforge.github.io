@@ -64,7 +64,7 @@ export const hasSpeechSymbols = (text: string): boolean => {
 };
 
 /**
- * Voting temperatures for 3-way voting
+ * Voting temperatures for 3-way voting (assign step)
  */
 const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
 
@@ -72,6 +72,67 @@ const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
  * Delay between LLM API calls (ms)
  */
 const LLM_DELAY_MS = 1000;
+
+/**
+ * Count occurrences of each character canonical name
+ */
+function countCharacterOccurrences(characters: LLMCharacter[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const char of characters) {
+    const key = char.canonicalName.toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Preprocess characters: filter rare ones (< minOccurrencePercent) and map to generic voices
+ */
+function preprocessCharacters(
+  characters: LLMCharacter[],
+  occurrenceCounts: Map<string, number>,
+  totalOccurrences: number,
+  minOccurrencePercent: number,
+  logger?: ILogger
+): LLMCharacter[] {
+  const minOccurrence = Math.max(1, Math.floor(totalOccurrences * minOccurrencePercent));
+
+  const result: LLMCharacter[] = [];
+  let maleGeneric: LLMCharacter | null = null;
+  let femaleGeneric: LLMCharacter | null = null;
+  let unknownGeneric: LLMCharacter | null = null;
+  let removedCount = 0;
+
+  for (const char of characters) {
+    const key = char.canonicalName.toLowerCase();
+    const count = occurrenceCounts.get(key) ?? 0;
+
+    if (count >= minOccurrence) {
+      result.push(char);
+    } else {
+      removedCount++;
+      // Map to generic based on gender (create once, reuse)
+      if (char.gender === 'male') {
+        maleGeneric ??= { canonicalName: 'unknown_male', variations: [], gender: 'male' };
+      } else if (char.gender === 'female') {
+        femaleGeneric ??= { canonicalName: 'unknown_female', variations: [], gender: 'female' };
+      } else {
+        unknownGeneric ??= { canonicalName: 'unknown', variations: [], gender: 'unknown' };
+      }
+    }
+  }
+
+  // Add generic characters if any rare chars were mapped to them
+  if (maleGeneric) result.push(maleGeneric);
+  if (femaleGeneric) result.push(femaleGeneric);
+  if (unknownGeneric) result.push(unknownGeneric);
+
+  if (removedCount > 0) {
+    logger?.info(`[Merge] Preprocessed: ${characters.length} → ${result.length} characters (${removedCount} rare chars → generic)`);
+  }
+
+  return result;
+}
 
 /**
  * Majority vote helper for 3-way voting.
@@ -220,12 +281,15 @@ export class LLMVoiceService {
     }
 
     // Simple merge by canonicalName first
+    // Count occurrences before merge (for preprocessing)
+    const occurrenceCounts = countCharacterOccurrences(allCharacters);
+    const totalOccurrences = allCharacters.length;
     let merged = mergeCharacters(allCharacters);
 
     // LLM merge only if multiple blocks were processed and multiple characters exist
     if (blocks.length > 1 && merged.length > 1) {
       onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
-      merged = await this.mergeCharactersWithLLM(merged, onProgress);
+      merged = await this.mergeCharactersWithLLM(merged, occurrenceCounts, totalOccurrences, onProgress);
       onProgress?.(blocks.length, blocks.length, `Merged to ${merged.length} characters`);
     }
 
@@ -412,87 +476,90 @@ export class LLMVoiceService {
   }
 
   /**
-   * LLM-based character merge to deduplicate characters with different canonical names
-   * Uses hierarchical chunking for large character lists
+   * LLM-based character merge using 5-way voting with median selection
+   * 1. Preprocess: filter rare characters (< 0.1%) to generic voices
+   * 2. Run merge 5x with different temperatures
+   * 3. Pick result with median character count
    */
   private async mergeCharactersWithLLM(
     characters: LLMCharacter[],
-    onProgress?: ProgressCallback,
-    iteration: number = 0,
-    prevCount: number = Infinity
+    occurrenceCounts: Map<string, number>,
+    totalOccurrences: number,
+    onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> {
-    const { mergeChunkSize, mergeChunkThreshold, mergeMaxIterations, mergeMinReductionPercent } = defaultConfig.llm;
+    const { mergeVotingTemperatures, mergeMinOccurrencePercent } = defaultConfig.llm;
 
-    // Small enough for single merge
-    if (characters.length <= mergeChunkThreshold) {
-      return this.singleMerge(characters, onProgress);
+    // Phase 1: Preprocess - filter rare characters
+    const preprocessed = preprocessCharacters(
+      characters,
+      occurrenceCounts,
+      totalOccurrences,
+      mergeMinOccurrencePercent,
+      this.logger
+    );
+
+    // If only generic characters remain, skip LLM merge
+    if (preprocessed.length <= 3) {
+      this.logger?.info(`[Merge] Only ${preprocessed.length} characters after preprocessing, skipping LLM merge`);
+      return preprocessed;
     }
 
-    // Check iteration limit
-    if (iteration >= mergeMaxIterations) {
-      this.logger?.warn(`[Merge] Max iterations (${mergeMaxIterations}) reached with ${characters.length} characters, doing final merge`);
-      return this.singleMerge(characters, onProgress);
-    }
+    // Phase 2: 5-way voting merge
+    this.logger?.info(`[Merge] Starting 5-way voting merge with ${preprocessed.length} characters`);
+    const results: LLMCharacter[][] = [];
 
-    // Check convergence - if not reducing meaningfully, stop
-    if (iteration > 0) {
-      const reduction = ((prevCount - characters.length) / prevCount) * 100;
-      if (reduction < mergeMinReductionPercent) {
-        this.logger?.warn(`[Merge] Convergence detected (${reduction.toFixed(1)}% reduction), doing final merge with ${characters.length} characters`);
-        return this.singleMerge(characters, onProgress);
-      }
-    }
-
-    // Phase 1: Sequential chunk merge
-    this.logger?.info(`[Merge] Iteration ${iteration + 1}: Chunking ${characters.length} characters into chunks of ${mergeChunkSize}`);
-    const chunks = this.splitIntoChunks(characters, mergeChunkSize);
-    const chunkResults: LLMCharacter[][] = [];
-
-    for (let i = 0; i < chunks.length; i++) {
+    for (let i = 0; i < mergeVotingTemperatures.length; i++) {
       if (this.abortController?.signal.aborted) {
         throw new Error('Operation cancelled');
       }
 
-      onProgress?.(i + 1, chunks.length + 1, `Merging chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
-      const merged = await this.singleMerge(chunks[i]);
-      chunkResults.push(merged);
-      this.logger?.info(`[Merge] Chunk ${i + 1}/${chunks.length}: ${chunks[i].length} → ${merged.length} characters`);
+      const temp = mergeVotingTemperatures[i];
+      onProgress?.(i + 1, mergeVotingTemperatures.length, `Merge vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp})...`);
 
-      // Small delay between chunks to avoid rate limits
-      if (i < chunks.length - 1) {
+      const result = await this.singleMerge(preprocessed, temp, onProgress);
+      results.push(result);
+      this.logger?.info(`[Merge] Vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp}): ${result.length} characters`);
+
+      // Small delay between votes to avoid rate limits
+      if (i < mergeVotingTemperatures.length - 1) {
         await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
-    // Phase 2: Cross-chunk merge
-    const combined = chunkResults.flat();
-    this.logger?.info(`[Merge] Cross-chunk merge: ${combined.length} characters (was ${characters.length})`);
-    onProgress?.(chunks.length, chunks.length + 1, `Cross-chunk merge (${combined.length} chars)...`);
+    // Phase 3: Pick median result by character count
+    results.sort((a, b) => a.length - b.length);
+    const medianIndex = Math.floor(results.length / 2);
+    const median = results[medianIndex];
 
-    // Recursive with iteration tracking
-    return this.mergeCharactersWithLLM(combined, onProgress, iteration + 1, characters.length);
+    this.logger?.info(`[Merge] Voting results: [${results.map(r => r.length).join(', ')}] → picked median: ${median.length} characters`);
+
+    return median;
   }
 
   /**
-   * Split characters into chunks of specified size
-   */
-  private splitIntoChunks(characters: LLMCharacter[], size: number): LLMCharacter[][] {
-    const chunks: LLMCharacter[][] = [];
-    for (let i = 0; i < characters.length; i += size) {
-      chunks.push(characters.slice(i, i + size));
-    }
-    return chunks;
-  }
-
-  /**
-   * Single merge operation (original logic)
+   * Single merge operation with specified temperature
    */
   private async singleMerge(
     characters: LLMCharacter[],
+    temperature: number,
     onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> {
-    this.logger?.info(`[Merge] Single merge: ${characters.length} characters`);
-    const response = await this.mergeApiClient.callWithRetry(
+    this.logger?.info(`[Merge] Single merge: ${characters.length} characters (temp=${temperature})`);
+
+    // Create a client with the specified temperature
+    const client = new LLMApiClient({
+      apiKey: this.options.mergeConfig?.apiKey ?? this.options.apiKey,
+      apiUrl: this.options.mergeConfig?.apiUrl ?? this.options.apiUrl,
+      model: this.options.mergeConfig?.model ?? this.options.model,
+      streaming: this.options.mergeConfig?.streaming ?? this.options.streaming,
+      reasoning: this.options.mergeConfig?.reasoning ?? this.options.reasoning,
+      temperature: temperature,
+      topP: this.options.mergeConfig?.topP ?? this.options.topP,
+      directoryHandle: this.options.directoryHandle,
+      logger: this.logger,
+    });
+
+    const response = await client.callWithRetry(
       buildMergePrompt(characters),
       (result) => validateMergeResponse(result, characters),
       this.abortController?.signal,

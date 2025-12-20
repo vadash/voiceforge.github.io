@@ -52,14 +52,10 @@ export interface LLMConfig {
   maxTokens: number;
   /** Maximum retries for assign blocks before fallback to default voice */
   maxAssignRetries: number;
-  /** Characters per merge chunk */
-  mergeChunkSize: number;
-  /** Threshold to trigger chunked merge (if chars > this, use chunking) */
-  mergeChunkThreshold: number;
-  /** Maximum merge iterations before forcing final merge */
-  mergeMaxIterations: number;
-  /** Minimum reduction % to continue iterating (stops if less) */
-  mergeMinReductionPercent: number;
+  /** Temperatures for 5-way voting merge */
+  mergeVotingTemperatures: number[];
+  /** Minimum occurrence percent to keep a character (below this → generic voice) */
+  mergeMinOccurrencePercent: number;
 }
 
 export interface RetryConfig {
@@ -134,10 +130,8 @@ export const defaultConfig: AppConfig = {
     maxConcurrentRequests: 3,
     maxTokens: 8000,
     maxAssignRetries: 3,
-    mergeChunkSize: 50,
-    mergeChunkThreshold: 150,
-    mergeMaxIterations: 5,
-    mergeMinReductionPercent: 5,
+    mergeVotingTemperatures: [0.1, 0.2, 0.3, 0.4, 0.5],
+    mergeMinOccurrencePercent: 0.001, // 0.1%
   },
 
   retry: {
