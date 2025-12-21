@@ -202,6 +202,11 @@ export class ConversionOrchestrator {
         this.stores.conversion.setStatus('converting');
         this.stores.llm.setProcessingStatus('idle');
         this.stores.conversion.updateProgress(progress.current, progress.total);
+        // Clear large data no longer needed to reduce memory
+        if (progress.current === 0) {
+          this.stores.data.setTextContent('');
+          this.stores.data.setBook(null);
+        }
         break;
 
       case StepNames.AUDIO_MERGE:

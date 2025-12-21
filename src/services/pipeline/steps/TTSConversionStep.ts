@@ -120,7 +120,14 @@ export class TTSConversionStep extends BasePipelineStep {
       }
 
       return {
-        ...context,
+        // Only keep fields needed by downstream steps
+        // Drop: assignments, characters to free memory
+        text: '', // Clear - no longer needed
+        fileNames: context.fileNames,
+        dictionaryRules: [], // Clear - no longer needed
+        detectedLanguage: context.detectedLanguage,
+        directoryHandle: context.directoryHandle,
+        voiceMap: context.voiceMap,
         audioMap,
         tempDirHandle,
         failedTasks,
