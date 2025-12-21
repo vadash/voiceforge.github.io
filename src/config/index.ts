@@ -104,7 +104,7 @@ export interface AppConfig {
  */
 export const defaultConfig: AppConfig = {
   tts: {
-    maxWorkers: 20,
+    maxWorkers: 15,
     workersPerMinute: 50,
     errorCooldown: 10000, // 10 seconds
   },
@@ -129,7 +129,7 @@ export const defaultConfig: AppConfig = {
   llm: {
     extractBlockTokens: 16000,
     assignBlockTokens: 8000,
-    maxConcurrentRequests: 3,
+    maxConcurrentRequests: 2,
     maxTokens: 8000,
     maxAssignRetries: 3,
     maxMergeRetries: 5,

@@ -16,7 +16,8 @@ const defaultSettings: AppSettings = {
   enabledVoices: [], // Empty means all voices enabled
   rate: 0,
   pitch: 0,
-  maxThreads: 20,
+  ttsThreads: 15,
+  llmThreads: 2,
   lexxRegister: true,
   showDopSettings: false,
   isLiteMode: true,
@@ -44,7 +45,8 @@ export class SettingsStore {
   readonly pitch = signal<number>(defaultSettings.pitch);
 
   // Processing settings
-  readonly maxThreads = signal<number>(defaultSettings.maxThreads);
+  readonly ttsThreads = signal<number>(defaultSettings.ttsThreads);
+  readonly llmThreads = signal<number>(defaultSettings.llmThreads);
   readonly outputFormat = signal<'mp3' | 'opus'>(defaultSettings.outputFormat);
   readonly silenceRemovalEnabled = signal<boolean>(defaultSettings.silenceRemovalEnabled);
   readonly normalizationEnabled = signal<boolean>(defaultSettings.normalizationEnabled);
@@ -107,8 +109,13 @@ export class SettingsStore {
 
   // ========== Processing Setters ==========
 
-  setMaxThreads(value: number): void {
-    this.maxThreads.value = value;
+  setTtsThreads(value: number): void {
+    this.ttsThreads.value = value;
+    this.save();
+  }
+
+  setLlmThreads(value: number): void {
+    this.llmThreads.value = value;
     this.save();
   }
 
@@ -194,7 +201,8 @@ export class SettingsStore {
       enabledVoices: this.enabledVoices.value,
       rate: this.rate.value,
       pitch: this.pitch.value,
-      maxThreads: this.maxThreads.value,
+      ttsThreads: this.ttsThreads.value,
+      llmThreads: this.llmThreads.value,
       lexxRegister: this.lexxRegister.value,
       showDopSettings: this.showDopSettings.value,
       isLiteMode: this.isLiteMode.value,
@@ -222,7 +230,8 @@ export class SettingsStore {
         this.enabledVoices.value = settings.enabledVoices ?? defaultSettings.enabledVoices;
         this.rate.value = settings.rate ?? defaultSettings.rate;
         this.pitch.value = settings.pitch ?? defaultSettings.pitch;
-        this.maxThreads.value = settings.maxThreads ?? defaultSettings.maxThreads;
+        this.ttsThreads.value = settings.ttsThreads ?? defaultSettings.ttsThreads;
+        this.llmThreads.value = settings.llmThreads ?? defaultSettings.llmThreads;
         this.lexxRegister.value = settings.lexxRegister ?? defaultSettings.lexxRegister;
         this.showDopSettings.value = settings.showDopSettings ?? defaultSettings.showDopSettings;
         this.isLiteMode.value = settings.isLiteMode ?? defaultSettings.isLiteMode;
@@ -251,7 +260,8 @@ export class SettingsStore {
     this.enabledVoices.value = defaultSettings.enabledVoices;
     this.rate.value = defaultSettings.rate;
     this.pitch.value = defaultSettings.pitch;
-    this.maxThreads.value = defaultSettings.maxThreads;
+    this.ttsThreads.value = defaultSettings.ttsThreads;
+    this.llmThreads.value = defaultSettings.llmThreads;
     this.lexxRegister.value = defaultSettings.lexxRegister;
     this.showDopSettings.value = defaultSettings.showDopSettings;
     this.isLiteMode.value = defaultSettings.isLiteMode;
@@ -274,7 +284,8 @@ export class SettingsStore {
       enabledVoices: this.enabledVoices.value,
       rate: this.rate.value,
       pitch: this.pitch.value,
-      maxThreads: this.maxThreads.value,
+      ttsThreads: this.ttsThreads.value,
+      llmThreads: this.llmThreads.value,
       lexxRegister: this.lexxRegister.value,
       showDopSettings: this.showDopSettings.value,
       isLiteMode: this.isLiteMode.value,

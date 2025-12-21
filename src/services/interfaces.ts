@@ -398,6 +398,7 @@ export interface LLMServiceFactoryOptions {
   temperature?: number;
   topP?: number;
   useVoting?: boolean;
+  maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
   // Optional separate config for merge stage

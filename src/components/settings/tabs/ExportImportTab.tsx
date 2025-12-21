@@ -103,7 +103,8 @@ export function ExportImportTab() {
       if (s.enabledVoices) settings.setEnabledVoices(s.enabledVoices as string[]);
       if (s.rate !== undefined) settings.setRate(s.rate as number);
       if (s.pitch !== undefined) settings.setPitch(s.pitch as number);
-      if (s.maxThreads !== undefined) settings.setMaxThreads(s.maxThreads as number);
+      if (s.ttsThreads !== undefined) settings.setTtsThreads(s.ttsThreads as number);
+      if (s.llmThreads !== undefined) settings.setLlmThreads(s.llmThreads as number);
       if (s.outputFormat) settings.setOutputFormat(s.outputFormat as 'mp3' | 'opus');
       if (s.silenceRemovalEnabled !== undefined) settings.setSilenceRemovalEnabled(s.silenceRemovalEnabled as boolean);
       if (s.normalizationEnabled !== undefined) settings.setNormalizationEnabled(s.normalizationEnabled as boolean);

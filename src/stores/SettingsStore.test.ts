@@ -20,7 +20,8 @@ describe('SettingsStore', () => {
       expect(store.narratorVoice.value).toBe('ru-RU, DmitryNeural');
       expect(store.rate.value).toBe(0);
       expect(store.pitch.value).toBe(0);
-      expect(store.maxThreads.value).toBe(20);
+      expect(store.ttsThreads.value).toBe(15);
+      expect(store.llmThreads.value).toBe(2);
       expect(store.outputFormat.value).toBe('opus');
       expect(store.silenceRemovalEnabled.value).toBe(true);
       expect(store.normalizationEnabled.value).toBe(false);
@@ -43,9 +44,14 @@ describe('SettingsStore', () => {
       expect(store.pitch.value).toBe(-25);
     });
 
-    it('setMaxThreads should update threads', () => {
-      store.setMaxThreads(10);
-      expect(store.maxThreads.value).toBe(10);
+    it('setTtsThreads should update TTS threads', () => {
+      store.setTtsThreads(10);
+      expect(store.ttsThreads.value).toBe(10);
+    });
+
+    it('setLlmThreads should update LLM threads', () => {
+      store.setLlmThreads(3);
+      expect(store.llmThreads.value).toBe(3);
     });
 
     it('setOutputFormat should update format', () => {
@@ -89,7 +95,7 @@ describe('SettingsStore', () => {
   describe('persistence', () => {
     it('save should store settings in localStorage', () => {
       store.setRate(50);
-      store.setMaxThreads(15);
+      store.setTtsThreads(10);
       store.save();
 
       expect(localStorage.setItem).toHaveBeenCalled();
@@ -100,7 +106,8 @@ describe('SettingsStore', () => {
         narratorVoice: 'ru-RU-SvetlanaNeural',
         rate: 30,
         pitch: -10,
-        maxThreads: 25,
+        ttsThreads: 25,
+        llmThreads: 8,
         outputFormat: 'mp3',
       };
       localStorage.getItem = vi.fn(() => JSON.stringify(savedState));
@@ -110,7 +117,8 @@ describe('SettingsStore', () => {
       expect(store.narratorVoice.value).toBe('ru-RU-SvetlanaNeural');
       expect(store.rate.value).toBe(30);
       expect(store.pitch.value).toBe(-10);
-      expect(store.maxThreads.value).toBe(25);
+      expect(store.ttsThreads.value).toBe(25);
+      expect(store.llmThreads.value).toBe(8);
       expect(store.outputFormat.value).toBe('mp3');
     });
 
@@ -123,11 +131,12 @@ describe('SettingsStore', () => {
 
     it('reset should restore default values', () => {
       store.setRate(50);
-      store.setMaxThreads(10);
+      store.setTtsThreads(10);
       store.reset();
 
       expect(store.rate.value).toBe(0);
-      expect(store.maxThreads.value).toBe(20);
+      expect(store.ttsThreads.value).toBe(15);
+      expect(store.llmThreads.value).toBe(2);
     });
   });
 });

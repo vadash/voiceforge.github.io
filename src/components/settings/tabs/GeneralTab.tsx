@@ -31,7 +31,7 @@ export function GeneralTab() {
 
       {/* Speed */}
       <Slider
-        label="Speed"
+        label="settings.rate"
         value={settings.rate.value}
         min={-50}
         max={100}
@@ -41,7 +41,7 @@ export function GeneralTab() {
 
       {/* Pitch */}
       <Slider
-        label="Pitch"
+        label="settings.pitch"
         value={settings.pitch.value}
         min={-50}
         max={50}
@@ -49,13 +49,22 @@ export function GeneralTab() {
         formatValue={(v) => v >= 0 ? `+${v}Hz` : `${v}Hz`}
       />
 
-      {/* Threads */}
+      {/* TTS Threads */}
       <Slider
-        label="Threads"
-        value={settings.maxThreads.value}
+        label="settings.ttsThreads"
+        value={settings.ttsThreads.value}
         min={1}
         max={30}
-        onChange={(v) => settings.setMaxThreads(v)}
+        onChange={(v) => settings.setTtsThreads(v)}
+      />
+
+      {/* LLM Threads */}
+      <Slider
+        label="settings.llmThreads"
+        value={settings.llmThreads.value}
+        min={1}
+        max={10}
+        onChange={(v) => settings.setLlmThreads(v)}
       />
 
       {/* Save */}

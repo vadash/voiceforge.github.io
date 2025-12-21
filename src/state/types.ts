@@ -14,7 +14,8 @@ export interface AppSettings {
   enabledVoices: string[];
   rate: number;
   pitch: number;
-  maxThreads: number;
+  ttsThreads: number;
+  llmThreads: number;
   lexxRegister: boolean;
   showDopSettings: boolean;
   isLiteMode: boolean;

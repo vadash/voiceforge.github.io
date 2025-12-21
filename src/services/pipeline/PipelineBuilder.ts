@@ -47,7 +47,8 @@ export interface PipelineBuilderOptions {
   voice: string;
   pitch: number;
   rate: number;
-  maxThreads: number;
+  ttsThreads: number;
+  llmThreads: number;
   enabledVoices: string[];
   lexxRegister: boolean;
   outputFormat: 'mp3' | 'opus';
@@ -117,6 +118,7 @@ export class PipelineBuilder implements IPipelineBuilder {
       reasoning: options.extractConfig.reasoning,
       temperature: options.extractConfig.temperature,
       topP: options.extractConfig.topP,
+      maxConcurrentRequests: options.llmThreads,
       directoryHandle: options.directoryHandle,
       logger: this.logger,
       // Pass merge config for the merge phase
@@ -142,6 +144,7 @@ export class PipelineBuilder implements IPipelineBuilder {
       temperature: options.assignConfig.temperature,
       topP: options.assignConfig.topP,
       useVoting: options.useVoting,
+      maxConcurrentRequests: options.llmThreads,
       directoryHandle: options.directoryHandle,
       logger: this.logger,
     };
@@ -182,7 +185,7 @@ export class PipelineBuilder implements IPipelineBuilder {
         caseSensitive: options.lexxRegister,
       })
       .addStep(StepNames.TTS_CONVERSION, {
-        maxWorkers: options.maxThreads,
+        maxWorkers: options.ttsThreads,
         ttsConfig,
         createWorkerPool: (opts: WorkerPoolOptions) => this.workerPoolFactory.create(opts),
       })

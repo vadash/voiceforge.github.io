@@ -1,3 +1,5 @@
+import { Text } from 'preact-i18n';
+
 interface SliderProps {
   label?: string;
   value: number;
@@ -23,7 +25,9 @@ export function Slider({
     <div className={`space-y-2 ${disabled ? 'opacity-50' : ''}`}>
       {label && (
         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">{label}</span>
+          <span className="text-gray-400">
+            <Text id={label}>{label}</Text>
+          </span>
           <span className="text-white font-medium">{formatValue(value)}</span>
         </div>
       )}

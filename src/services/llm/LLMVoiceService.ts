@@ -173,6 +173,7 @@ export interface LLMVoiceServiceOptions {
   temperature?: number;
   topP?: number;
   useVoting?: boolean;
+  maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
   // Optional separate config for merge stage
@@ -329,7 +330,7 @@ export class LLMVoiceService {
     characters: LLMCharacter[],
     onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> {
-    const maxConcurrent = defaultConfig.llm.maxConcurrentRequests;
+    const maxConcurrent = this.options.maxConcurrentRequests ?? defaultConfig.llm.maxConcurrentRequests;
     this.logger?.info(`[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent${this.options.useVoting ? ', voting enabled' : ''})`);
     const results: SpeakerAssignment[] = [];
     let completed = 0;
