@@ -123,13 +123,17 @@ describe('TTSConversionStep', () => {
       const context = createContextWithAssignments(testAssignments, {
         text: 'Original text.',
         characters: [{ code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] }],
+        detectedLanguage: 'en',
+        fileNames: [['chapter1', 0]],
       });
 
       const result = await step.execute(context, createNeverAbortSignal());
 
-      expect(result.text).toBe('Original text.');
-      expect(result.characters).toHaveLength(1);
-      expect(result.assignments).toEqual(testAssignments);
+      // TTSConversionStep clears text/characters/assignments to free memory
+      // Only essential downstream properties are preserved
+      expect(result.fileNames).toEqual([['chapter1', 0]]);
+      expect(result.detectedLanguage).toBe('en');
+      expect(result.directoryHandle).toBeDefined();
     });
   });
 
