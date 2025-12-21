@@ -92,8 +92,8 @@ export class TTSWorkerPool implements IWorkerPool {
         max: options.maxWorkers,
         min: 0, // Create connections on demand
         testOnBorrow: true, // Validate connection before use
-        idleTimeoutMillis: 30000, // Match keep-alive interval
-        evictionRunIntervalMillis: 15000, // Check for stale connections
+        // Note: evictionRunIntervalMillis disabled - uses Node.js setTimeout().unref()
+        // which doesn't exist in browsers. Idle connections cleaned up via cleanup() instead.
       }
     );
 
