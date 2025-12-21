@@ -1012,65 +1012,85 @@ You MUST output ONLY valid JSON. No markdown. No explanations.
 
 **STRUCTURE:**
 {
-  "merges": [
-    {
-      "keep": "CanonicalNameToKeep",
-      "absorb": ["Name1ToAbsorb", "Name2ToAbsorb"],
-      "variations": ["AllNames", "Combined", "Here"],
-      "gender": "male" | "female" | "unknown"
-    }
-  ],
-  "unchanged": ["CharacterName1", "CharacterName2"]
+  "merges": [[keepIndex, absorbIndex1, absorbIndex2, ...], ...]
 }
 
 **FIELD DEFINITIONS:**
-- **merges**: Array of merge operations (empty [] if no merges needed)
-- **keep**: The canonical name to use (MUST match exactly one input character name)
-- **absorb**: Array of names being merged INTO keep (MUST match exactly input names)
-- **variations**: Combined array of all names/aliases from merged entries
-- **gender**: The resolved gender for the merged character
-- **unchanged**: Array of character names that have no duplicates (MUST match exactly input names)
+- **merges**: Array of merge groups (empty [] if no merges needed)
+- Each group is an array of character indices (1-based, matching input list numbers)
+- **First index** in each group = the "keep" character (canonical name to preserve)
+- **Remaining indices** = characters absorbed into the keep
+- Characters NOT listed in any group are automatically unchanged (no need to list them)
 
 **CRITICAL VALIDATION:**
-Every single character from the input MUST appear in the output either:
-- In a "merges" entry (as "keep" OR in "absorb" array)
-- In the "unchanged" array
-
-Count: input characters = output characters (merged + unchanged)
+- Each index must appear in AT MOST one group
+- Indices must be valid (1 to N where N = number of input characters)
+- Groups must have at least 2 indices (single characters need no group)
 </output_format>
 
 <output_examples>
 
 **Example 1: No Merges Needed**
-Input characters: ["John", "Mary", "System"]
+Input characters:
+1. canonicalName: "John"
+2. canonicalName: "Mary"
+3. canonicalName: "System"
 Output:
-{"merges": [], "unchanged": ["John", "Mary", "System"]}
+{"merges": []}
 
 **Example 2: Protagonist Merge**
-Input characters: ["Protagonist", "Elena", "Guard"]
+Input characters:
+1. canonicalName: "Protagonist"
+2. canonicalName: "Elena"
+3. canonicalName: "Guard"
+(Elena is the protagonist)
 Output:
-{"merges": [{"keep": "Elena", "absorb": ["Protagonist"], "variations": ["Elena", "Protagonist"], "gender": "female"}], "unchanged": ["Guard"]}
+{"merges": [[2, 1]]}
+(Keep Elena at index 2, absorb Protagonist at index 1)
 
 **Example 3: System Unification**
-Input characters: ["System", "Interface", "Blue Box", "Sarah"]
+Input characters:
+1. canonicalName: "System"
+2. canonicalName: "Interface"
+3. canonicalName: "Blue Box"
+4. canonicalName: "Sarah"
 Output:
-{"merges": [{"keep": "System", "absorb": ["Interface", "Blue Box"], "variations": ["System", "Interface", "Blue Box"], "gender": "female"}], "unchanged": ["Sarah"]}
+{"merges": [[1, 2, 3]]}
+(Keep System at index 1, absorb Interface and Blue Box)
 
 **Example 4: Multiple Merges**
-Input characters: ["Protagonist", "Jason", "System", "Interface", "The King", "Ranvar", "Sarah", "The Guard"]
+Input characters:
+1. canonicalName: "Protagonist"
+2. canonicalName: "Jason"
+3. canonicalName: "System"
+4. canonicalName: "Interface"
+5. canonicalName: "The King"
+6. canonicalName: "Ranvar"
+7. canonicalName: "Sarah"
+8. canonicalName: "The Guard"
 Output:
-{"merges": [{"keep": "Jason", "absorb": ["Protagonist"], "variations": ["Jason", "Protagonist"], "gender": "male"}, {"keep": "System", "absorb": ["Interface"], "variations": ["System", "Interface"], "gender": "female"}, {"keep": "Ranvar", "absorb": ["The King"], "variations": ["Ranvar", "The King", "King"], "gender": "male"}], "unchanged": ["Sarah", "The Guard"]}
+{"merges": [[2, 1], [3, 4], [6, 5]]}
+(Jason absorbs Protagonist, System absorbs Interface, Ranvar absorbs The King)
 
 **Example 5: Title and Name Merge**
-Input characters: ["The Dark Lord", "Azaroth", "The Hero", "Elena", "System"]
+Input characters:
+1. canonicalName: "The Dark Lord"
+2. canonicalName: "Azaroth"
+3. canonicalName: "The Hero"
+4. canonicalName: "Elena"
+5. canonicalName: "System"
 Output:
-{"merges": [{"keep": "Azaroth", "absorb": ["The Dark Lord"], "variations": ["Azaroth", "The Dark Lord", "Dark Lord"], "gender": "male"}, {"keep": "Elena", "absorb": ["The Hero"], "variations": ["Elena", "The Hero", "Hero"], "gender": "female"}], "unchanged": ["System"]}
+{"merges": [[2, 1], [4, 3]]}
+(Azaroth absorbs The Dark Lord, Elena absorbs The Hero)
 
 **Example 6: No Merge - Different People**
-Input characters: ["The King", "The Prince", "The Queen"]
+Input characters:
+1. canonicalName: "The King"
+2. canonicalName: "The Prince"
+3. canonicalName: "The Queen"
 (These are different people - do not merge)
 Output:
-{"merges": [], "unchanged": ["The King", "The Prince", "The Queen"]}
+{"merges": []}
 
 </output_examples>
 
@@ -1082,35 +1102,30 @@ Output:
 Before outputting, verify:
 
 □ All duplicate characters are identified and merged
-□ "keep" values are the most specific proper names
-□ "absorb" values exactly match input character names
-□ "variations" includes ALL names from merged entries
-□ "unchanged" lists all characters with no duplicates
-□ Gender is resolved (specific over "unknown")
-□ System variants are unified into "System"
+□ First index in each group is the most specific proper name
+□ Indices are valid (1 to N)
+□ No index appears in multiple groups
+□ Gender resolution will use first non-unknown from merged characters
+□ System variants are unified (pick System index first)
 □ Protagonist is linked to named character if appropriate
 □ Different people are NOT merged (family, different roles)
-□ **CRITICAL: ALL input characters appear in output (merges + unchanged)**
 □ Output is valid JSON only
 </checklist>
 
 <critical_warning>
-**EVERY SINGLE CHARACTER FROM THE INPUT MUST BE ACCOUNTED FOR!**
+**INDICES MUST BE VALID!**
 
-Verification:
-- Count the input characters
-- Count your output (all "keep" + all "absorb" + all "unchanged")
-- These numbers MUST be equal
-
-If any character is missing from the output, the merge operation FAILS.
+- Use 1-based indices matching the input list numbers
+- First index in group = the character to KEEP
+- Remaining indices = characters to ABSORB into keep
+- Characters not in any group remain unchanged automatically
 </critical_warning>
 
 <fallback_instruction>
 **WHEN UNCERTAIN ABOUT A MERGE:**
-1. If unsure whether two characters are the same → put BOTH in "unchanged" (conservative)
-2. If variations array would have duplicates → deduplicate them
-3. If chain merge is needed (A→B→C) → find most specific name, absorb all others
-4. Never drop a character - every input must appear in output
+1. If unsure whether two characters are the same → do NOT include them in a merge group (conservative)
+2. If chain merge is needed (A→B→C all same person) → put all indices in one group, first = most specific name
+3. Never include invalid indices
 </fallback_instruction>
 `,
     userTemplate: `<character_list>

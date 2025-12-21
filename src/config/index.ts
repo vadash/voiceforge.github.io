@@ -54,8 +54,8 @@ export interface LLMConfig {
   maxAssignRetries: number;
   /** Maximum retries for each merge vote before skipping */
   maxMergeRetries: number;
-  /** Temperatures for 5-way voting merge */
-  mergeVotingTemperatures: number[];
+  /** Number of merge votes for consensus */
+  mergeVoteCount: number;
   /** Minimum occurrence percent to keep a character (below this → generic voice) */
   mergeMinOccurrencePercent: number;
 }
@@ -133,8 +133,8 @@ export const defaultConfig: AppConfig = {
     maxTokens: 8000,
     maxAssignRetries: 3,
     maxMergeRetries: 5,
-    mergeVotingTemperatures: [0.1, 0.2, 0.3, 0.4, 0.5],
-    mergeMinOccurrencePercent: 0.001, // 0.1%
+    mergeVoteCount: 5,
+    mergeMinOccurrencePercent: 0.0005, // 0.05%
   },
 
   retry: {

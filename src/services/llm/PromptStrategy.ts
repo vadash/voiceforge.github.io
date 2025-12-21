@@ -2,14 +2,14 @@
 // Decouples prompt building, validation, and parsing from LLMVoiceService
 
 import type { LLMPrompt } from './LLMApiClient';
-import type { LLMCharacter, LLMValidationResult, ExtractResponse, MergeResponse } from '@/state/types';
+import type { LLMCharacter, LLMValidationResult, ExtractResponse } from '@/state/types';
 import { buildExtractPrompt, buildMergePrompt, buildAssignPrompt } from './PromptBuilders';
 import {
   validateExtractResponse,
   validateMergeResponse,
   validateAssignResponse,
   parseAssignResponse,
-  fixMergeResponse,
+  parseMergeResponse,
 } from './ResponseValidators';
 import { extractJSON } from '@/utils/llmUtils';
 
@@ -76,8 +76,9 @@ export class ExtractPromptStrategy implements IPromptStrategy<ExtractContext, Ex
 
 /**
  * Merge Strategy - Character deduplication/merging
+ * Returns merge groups as 0-based index arrays
  */
-export class MergePromptStrategy implements IPromptStrategy<MergeContext, MergeResponse> {
+export class MergePromptStrategy implements IPromptStrategy<MergeContext, number[][]> {
   buildPrompt(context: MergeContext): LLMPrompt {
     return buildMergePrompt(context.characters);
   }
@@ -86,10 +87,9 @@ export class MergePromptStrategy implements IPromptStrategy<MergeContext, MergeR
     return validateMergeResponse(response, context.characters);
   }
 
-  parseResponse(response: string, context: MergeContext): MergeResponse {
-    // Fix response by auto-adding any missing characters
-    const fixedResponse = fixMergeResponse(response, context.characters);
-    return JSON.parse(fixedResponse) as MergeResponse;
+  parseResponse(response: string, _context: MergeContext): number[][] {
+    // Returns 0-based indices
+    return parseMergeResponse(response);
   }
 }
 
@@ -122,7 +122,7 @@ export class AssignPromptStrategy implements IPromptStrategy<AssignContext, Assi
  */
 export function createDefaultStrategies(): {
   extract: IPromptStrategy<ExtractContext, ExtractResponse>;
-  merge: IPromptStrategy<MergeContext, MergeResponse>;
+  merge: IPromptStrategy<MergeContext, number[][]>;
   assign: IPromptStrategy<AssignContext, AssignResult>;
 } {
   return {

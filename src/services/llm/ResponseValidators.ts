@@ -1,4 +1,4 @@
-import type { LLMValidationResult, LLMCharacter, MergeResponse } from '@/state/types';
+import type { LLMValidationResult, LLMCharacter } from '@/state/types';
 import { extractJSON } from '@/utils/llmUtils';
 
 /**
@@ -39,132 +39,56 @@ export function validateExtractResponse(response: string): LLMValidationResult {
   return { valid: errors.length === 0, errors };
 }
 
-// Calculate max missing characters tolerance: 10% of total, min 4, max 10
-const getMaxMissingCharactersTolerance = (totalChars: number): number =>
-  Math.max(4, Math.min(10, Math.round(totalChars * 0.1)));
+// Index-based merge response type
+export interface IndexMergeResponse {
+  merges: number[][];
+}
 
 /**
- * Validate Merge response (character deduplication)
- * Uses fuzzy matching: accepts variations as valid keep/absorb values
- * Tolerates missing characters (10% of total, min 4, max 10) - they'll be auto-added
+ * Validate Merge response (index-based format)
+ * Format: {"merges": [[keepIdx, absorbIdx1, absorbIdx2], ...]}
+ * Indices are 1-based matching input list
  */
 export function validateMergeResponse(response: string, characters: LLMCharacter[]): LLMValidationResult {
   const errors: string[] = [];
-  const validNames = new Set(characters.map((c) => c.canonicalName));
-
-  // Build variation -> canonicalName map for fuzzy matching
-  const variationToCanonical = new Map<string, string>();
-  for (const c of characters) {
-    variationToCanonical.set(c.canonicalName.toLowerCase(), c.canonicalName);
-    for (const v of c.variations) {
-      variationToCanonical.set(v.toLowerCase(), c.canonicalName);
-    }
-  }
-
-  // Helper to resolve name (exact match or variation fallback)
-  const resolveName = (name: string): string | null => {
-    if (validNames.has(name)) return name;
-    return variationToCanonical.get(name.toLowerCase()) ?? null;
-  };
+  const charCount = characters.length;
 
   try {
-    // Use extractJSON to handle thinking tags and markdown code blocks
     const cleaned = extractJSON(response);
-    const parsed = JSON.parse(cleaned) as MergeResponse;
+    const parsed = JSON.parse(cleaned) as IndexMergeResponse;
 
     if (!parsed.merges || !Array.isArray(parsed.merges)) {
       errors.push('Response must have a "merges" array');
       return { valid: false, errors };
     }
 
-    // Auto-fix missing unchanged array: compute from input chars minus merged ones
-    if (!parsed.unchanged || !Array.isArray(parsed.unchanged)) {
-      parsed.unchanged = [];
-      // Collect all names used in merges
-      const mergedNames = new Set<string>();
-      for (const merge of parsed.merges) {
-        if (merge.keep) {
-          const resolved = resolveName(merge.keep);
-          if (resolved) mergedNames.add(resolved);
-        }
-        if (Array.isArray(merge.absorb)) {
-          for (const name of merge.absorb) {
-            const resolved = resolveName(name);
-            if (resolved) mergedNames.add(resolved);
-          }
-        }
-      }
-      // Add unmerged characters to unchanged
-      for (const char of characters) {
-        if (!mergedNames.has(char.canonicalName)) {
-          parsed.unchanged.push(char.canonicalName);
-        }
-      }
-    }
+    const usedIndices = new Set<number>();
 
-    // Validate merges
-    const usedNames = new Set<string>();
     for (let i = 0; i < parsed.merges.length; i++) {
-      const merge = parsed.merges[i];
+      const group = parsed.merges[i];
 
-      if (!merge.keep || typeof merge.keep !== 'string') {
-        errors.push(`Merge ${i}: missing or invalid "keep"`);
-      } else {
-        const resolved = resolveName(merge.keep);
-        if (!resolved) {
-          errors.push(`Merge ${i}: "keep" name "${merge.keep}" not found in characters or variations`);
+      if (!Array.isArray(group)) {
+        errors.push(`Merge ${i}: group must be an array`);
+        continue;
+      }
+
+      if (group.length < 2) {
+        errors.push(`Merge ${i}: group must have at least 2 indices`);
+        continue;
+      }
+
+      for (const idx of group) {
+        if (typeof idx !== 'number' || !Number.isInteger(idx)) {
+          errors.push(`Merge ${i}: index "${idx}" is not an integer`);
+        } else if (idx < 1 || idx > charCount) {
+          errors.push(`Merge ${i}: index ${idx} out of range [1-${charCount}]`);
+        } else if (usedIndices.has(idx)) {
+          errors.push(`Merge ${i}: duplicate index ${idx}`);
         } else {
-          usedNames.add(resolved);
+          usedIndices.add(idx);
         }
       }
-
-      if (!merge.absorb || !Array.isArray(merge.absorb)) {
-        errors.push(`Merge ${i}: missing or invalid "absorb" array`);
-      } else {
-        for (const name of merge.absorb) {
-          const resolved = resolveName(name);
-          if (!resolved) {
-            errors.push(`Merge ${i}: absorbed name "${name}" not found in characters or variations`);
-          } else {
-            usedNames.add(resolved);
-          }
-        }
-      }
-
-      if (!merge.variations || !Array.isArray(merge.variations)) {
-        errors.push(`Merge ${i}: missing or invalid "variations" array`);
-      }
-
-      if (!['male', 'female', 'unknown'].includes(merge.gender)) {
-        errors.push(`Merge ${i}: gender must be "male", "female", or "unknown"`);
-      }
     }
-
-    // Validate unchanged
-    for (const name of parsed.unchanged) {
-      const resolved = resolveName(name);
-      if (!resolved) {
-        errors.push(`Unchanged name "${name}" not found in characters or variations`);
-      } else {
-        usedNames.add(resolved);
-      }
-    }
-
-    // Check all characters are accounted for - tolerate small number of missing
-    const missingCharacters: string[] = [];
-    for (const char of characters) {
-      if (!usedNames.has(char.canonicalName)) {
-        missingCharacters.push(char.canonicalName);
-      }
-    }
-
-    // Only fail if too many characters are missing
-    if (missingCharacters.length > getMaxMissingCharactersTolerance(characters.length)) {
-      for (const name of missingCharacters) {
-        errors.push(`Character "${name}" not found in merges or unchanged`);
-      }
-    }
-    // If within tolerance, these will be auto-added by fixMergeResponse
   } catch (e) {
     errors.push(`Invalid JSON: ${(e as Error).message}`);
   }
@@ -173,61 +97,16 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
 }
 
 /**
- * Fix merge response by auto-adding missing characters to unchanged list
- * Also creates unchanged array if missing
- * Call this after validation passes to ensure all characters are accounted for
+ * Parse merge response and return merge groups (0-based indices)
  */
-export function fixMergeResponse(response: string, characters: LLMCharacter[]): string {
+export function parseMergeResponse(response: string): number[][] {
   try {
-    // Use extractJSON to handle thinking tags and markdown code blocks
     const cleaned = extractJSON(response);
-    const parsed = JSON.parse(cleaned) as MergeResponse;
-    const validNames = new Set(characters.map((c) => c.canonicalName));
-
-    // Build variation -> canonicalName map
-    const variationToCanonical = new Map<string, string>();
-    for (const c of characters) {
-      variationToCanonical.set(c.canonicalName.toLowerCase(), c.canonicalName);
-      for (const v of c.variations) {
-        variationToCanonical.set(v.toLowerCase(), c.canonicalName);
-      }
-    }
-
-    const resolveName = (name: string): string | null => {
-      if (validNames.has(name)) return name;
-      return variationToCanonical.get(name.toLowerCase()) ?? null;
-    };
-
-    // Ensure unchanged array exists
-    if (!parsed.unchanged || !Array.isArray(parsed.unchanged)) {
-      parsed.unchanged = [];
-    }
-
-    // Find all used names
-    const usedNames = new Set<string>();
-    for (const merge of parsed.merges) {
-      const keepResolved = resolveName(merge.keep);
-      if (keepResolved) usedNames.add(keepResolved);
-      for (const name of merge.absorb) {
-        const resolved = resolveName(name);
-        if (resolved) usedNames.add(resolved);
-      }
-    }
-    for (const name of parsed.unchanged) {
-      const resolved = resolveName(name);
-      if (resolved) usedNames.add(resolved);
-    }
-
-    // Auto-add missing characters to unchanged
-    for (const char of characters) {
-      if (!usedNames.has(char.canonicalName)) {
-        parsed.unchanged.push(char.canonicalName);
-      }
-    }
-
-    return JSON.stringify(parsed);
+    const parsed = JSON.parse(cleaned) as IndexMergeResponse;
+    // Convert 1-based to 0-based indices
+    return (parsed.merges || []).map(group => group.map(idx => idx - 1));
   } catch {
-    return response; // Return original if parsing fails
+    return [];
   }
 }
 

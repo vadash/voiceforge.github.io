@@ -1,4 +1,4 @@
-import type { LLMCharacter, MergeResponse, SpeakerAssignment } from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 
 /**
  * Normalize canonicalNames to use the longest variation.
@@ -86,47 +86,41 @@ export function mergeCharacters(characters: LLMCharacter[]): LLMCharacter[] {
 }
 
 /**
- * Apply merge response to create final character list
- * Handles fuzzy matching: resolves variation names to canonicalNames
+ * Apply merge groups to create final character list
+ * mergeGroups: array of 0-based index arrays, first index is "keep"
  */
-export function applyMergeResponse(characters: LLMCharacter[], mergeResponse: MergeResponse): LLMCharacter[] {
+export function applyMergeGroups(characters: LLMCharacter[], mergeGroups: number[][]): LLMCharacter[] {
+  const mergedIndices = new Set<number>();
   const result: LLMCharacter[] = [];
-  const characterMap = new Map(characters.map((c) => [c.canonicalName, c]));
 
-  // Build variation -> canonicalName map for fuzzy resolution
-  const variationToCanonical = new Map<string, string>();
-  for (const c of characters) {
-    variationToCanonical.set(c.canonicalName.toLowerCase(), c.canonicalName);
-    for (const v of c.variations) {
-      variationToCanonical.set(v.toLowerCase(), c.canonicalName);
-    }
-  }
+  // Process merge groups
+  for (const group of mergeGroups) {
+    if (group.length < 2) continue;
 
-  // Helper to resolve name
-  const resolveName = (name: string): string | null => {
-    if (characterMap.has(name)) return name;
-    return variationToCanonical.get(name.toLowerCase()) ?? null;
-  };
+    const [keepIdx, ...absorbIdxs] = group;
+    const keep = characters[keepIdx];
+    if (!keep) continue;
 
-  // Add merged characters
-  for (const merge of mergeResponse.merges) {
-    // Use the resolved name (in case LLM used a variation)
-    const resolvedKeep = resolveName(merge.keep) ?? merge.keep;
-    result.push({
-      canonicalName: resolvedKeep,
-      variations: merge.variations,
-      gender: merge.gender,
-    });
+    const absorbed = absorbIdxs.map(i => characters[i]).filter(Boolean);
+    const allChars = [keep, ...absorbed];
+
+    // Merge variations and pick first non-unknown gender
+    const merged: LLMCharacter = {
+      canonicalName: keep.canonicalName,
+      variations: [...new Set(allChars.flatMap(c => c.variations))],
+      gender: allChars.find(c => c.gender !== 'unknown')?.gender || 'unknown'
+    };
+
+    result.push(merged);
+    group.forEach(i => mergedIndices.add(i));
   }
 
   // Add unchanged characters
-  for (const name of mergeResponse.unchanged) {
-    const resolvedName = resolveName(name);
-    const char = resolvedName ? characterMap.get(resolvedName) : null;
-    if (char) {
+  characters.forEach((char, i) => {
+    if (!mergedIndices.has(i)) {
       result.push({ ...char });
     }
-  }
+  });
 
   return result;
 }

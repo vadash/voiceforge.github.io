@@ -3,12 +3,11 @@ import type {
   LLMCharacter,
   ExtractResponse,
   SpeakerAssignment,
-  MergeResponse,
 } from '@/state/types';
 import type { ILogger, ProgressCallback } from '../interfaces';
 import { defaultConfig } from '@/config';
 import { LLMApiClient } from './LLMApiClient';
-import { buildCodeMapping, mergeCharacters, applyMergeResponse } from './CharacterUtils';
+import { buildCodeMapping, mergeCharacters, applyMergeGroups } from './CharacterUtils';
 import {
   type IPromptStrategy,
   type ExtractContext,
@@ -163,6 +162,106 @@ function majorityVote(
   return votes[0];
 }
 
+/**
+ * Build consensus merge groups from multiple votes using Union-Find.
+ * Pairs appearing in ≥3 of 5 votes get merged.
+ * Returns 0-based index groups.
+ */
+function buildMergeConsensus(votes: number[][][]): number[][] {
+  // Count how many votes have each pair in same group
+  const pairCounts = new Map<string, number>();
+  // Track which index was "keep" (first in group) for each pair
+  const keepVotes = new Map<string, number[]>();
+
+  for (const vote of votes) {
+    for (const group of vote) {
+      if (group.length < 2) continue;
+      const keep = group[0];
+      const sorted = [...group].sort((a, b) => a - b);
+
+      // Count all pairs in this group
+      for (let i = 0; i < sorted.length; i++) {
+        for (let j = i + 1; j < sorted.length; j++) {
+          const key = `${sorted[i]},${sorted[j]}`;
+          pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+          // Track who was keep for this pair
+          if (!keepVotes.has(key)) keepVotes.set(key, []);
+          keepVotes.get(key)!.push(keep);
+        }
+      }
+    }
+  }
+
+  // Build edges from pairs with ≥3 votes (majority of 5)
+  const edges: [number, number][] = [];
+  for (const [key, count] of pairCounts) {
+    if (count >= 3) {
+      const [a, b] = key.split(',').map(Number);
+      edges.push([a, b]);
+    }
+  }
+
+  // Union-Find to build connected components
+  const parent = new Map<number, number>();
+  const find = (x: number): number => {
+    if (!parent.has(x)) parent.set(x, x);
+    if (parent.get(x) !== x) parent.set(x, find(parent.get(x)!));
+    return parent.get(x)!;
+  };
+  const union = (x: number, y: number) => {
+    const px = find(x), py = find(y);
+    if (px !== py) parent.set(px, py);
+  };
+
+  for (const [a, b] of edges) {
+    union(a, b);
+  }
+
+  // Group by root
+  const groups = new Map<number, number[]>();
+  for (const node of parent.keys()) {
+    const root = find(node);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(node);
+  }
+
+  // For each group, pick "keep" as the most-voted keep index, or smallest
+  const result: number[][] = [];
+  for (const members of groups.values()) {
+    if (members.length < 2) continue; // Skip singletons
+
+    // Count keep votes for members of this group
+    const keepCounts = new Map<number, number>();
+    const sorted = [...members].sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        const key = `${sorted[i]},${sorted[j]}`;
+        const keeps = keepVotes.get(key) ?? [];
+        for (const k of keeps) {
+          if (members.includes(k)) {
+            keepCounts.set(k, (keepCounts.get(k) ?? 0) + 1);
+          }
+        }
+      }
+    }
+
+    // Pick most-voted keep, or smallest index
+    let keepIdx = Math.min(...members);
+    let maxVotes = 0;
+    for (const [idx, count] of keepCounts) {
+      if (count > maxVotes) {
+        maxVotes = count;
+        keepIdx = idx;
+      }
+    }
+
+    // Build group with keep first
+    result.push([keepIdx, ...members.filter(m => m !== keepIdx)]);
+  }
+
+  return result;
+}
+
 export interface LLMVoiceServiceOptions {
   apiKey: string;
   apiUrl: string;
@@ -189,7 +288,7 @@ export interface LLMVoiceServiceOptions {
   // Optional strategy overrides (for testing or custom implementations)
   strategies?: {
     extract?: IPromptStrategy<ExtractContext, ExtractResponse>;
-    merge?: IPromptStrategy<MergeContext, MergeResponse>;
+    merge?: IPromptStrategy<MergeContext, number[][]>;
     assign?: IPromptStrategy<AssignContext, AssignResult>;
   };
 }
@@ -206,7 +305,7 @@ export class LLMVoiceService {
 
   // Prompt strategies
   private extractStrategy: IPromptStrategy<ExtractContext, ExtractResponse>;
-  private mergeStrategy: IPromptStrategy<MergeContext, MergeResponse>;
+  private mergeStrategy: IPromptStrategy<MergeContext, number[][]>;
   private assignStrategy: IPromptStrategy<AssignContext, AssignResult>;
 
   constructor(options: LLMVoiceServiceOptions) {
@@ -510,10 +609,10 @@ export class LLMVoiceService {
   }
 
   /**
-   * LLM-based character merge using 5-way voting with median selection
-   * 1. Preprocess: filter rare characters (< 0.1%) to generic voices
-   * 2. Run merge 5x with different temperatures
-   * 3. Pick result with median character count
+   * LLM-based character merge using 5-way voting with consensus
+   * 1. Preprocess: filter rare characters (< 0.05%) to generic voices
+   * 2. Run merge 5x with random temperatures
+   * 3. Build consensus from all votes (pairs with ≥3 votes)
    */
   private async mergeCharactersWithLLM(
     characters: LLMCharacter[],
@@ -521,7 +620,7 @@ export class LLMVoiceService {
     totalOccurrences: number,
     onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> {
-    const { mergeVotingTemperatures, mergeMinOccurrencePercent } = defaultConfig.llm;
+    const { mergeVoteCount, mergeMinOccurrencePercent } = defaultConfig.llm;
 
     // Phase 1: Preprocess - filter rare characters
     const preprocessed = preprocessCharacters(
@@ -538,58 +637,59 @@ export class LLMVoiceService {
       return preprocessed;
     }
 
-    // Phase 2: 5-way voting merge
-    this.logger?.info(`[Merge] Starting 5-way voting merge with ${preprocessed.length} characters`);
-    const results: LLMCharacter[][] = [];
+    // Phase 2: 5-way voting merge with random temperatures
+    this.logger?.info(`[Merge] Starting ${mergeVoteCount}-way voting merge with ${preprocessed.length} characters`);
+    const votes: number[][][] = [];
 
-    for (let i = 0; i < mergeVotingTemperatures.length; i++) {
+    for (let i = 0; i < mergeVoteCount; i++) {
       if (this.abortController?.signal.aborted) {
         throw new Error('Operation cancelled');
       }
 
-      const temp = mergeVotingTemperatures[i];
-      onProgress?.(i + 1, mergeVotingTemperatures.length, `Merge vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp})...`);
+      const temp = Math.random(); // Random temperature 0.0-1.0
+      onProgress?.(i + 1, mergeVoteCount, `Merge vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)})...`);
 
-      const result = await this.singleMerge(preprocessed, temp, onProgress);
-      if (result !== null) {
-        results.push(result);
-        this.logger?.info(`[Merge] Vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp}): ${result.length} characters`);
+      const mergeGroups = await this.singleMerge(preprocessed, temp, onProgress);
+      if (mergeGroups !== null) {
+        votes.push(mergeGroups);
+        this.logger?.info(`[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}): ${mergeGroups.length} merges`);
       } else {
-        this.logger?.warn(`[Merge] Vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp}) failed, skipping`);
+        this.logger?.warn(`[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}) failed, skipping`);
       }
 
       // Small delay between votes to avoid rate limits
-      if (i < mergeVotingTemperatures.length - 1) {
+      if (i < mergeVoteCount - 1) {
         await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
     // Need at least 1 successful vote
-    if (results.length === 0) {
-      this.logger?.error(`[Merge] All ${mergeVotingTemperatures.length} votes failed, returning preprocessed characters`);
+    if (votes.length === 0) {
+      this.logger?.error(`[Merge] All ${mergeVoteCount} votes failed, returning preprocessed characters`);
       return preprocessed;
     }
 
-    // Phase 3: Pick median result by character count
-    results.sort((a, b) => a.length - b.length);
-    const medianIndex = Math.floor(results.length / 2);
-    const median = results[medianIndex];
+    // Phase 3: Build consensus from all votes
+    const consensusGroups = buildMergeConsensus(votes);
+    this.logger?.info(`[Merge] Consensus: ${consensusGroups.length} merges from ${votes.length} votes`);
 
-    this.logger?.info(`[Merge] Voting results: [${results.map(r => r.length).join(', ')}] → picked median: ${median.length} characters`);
+    // Apply consensus to preprocessed characters
+    const result = applyMergeGroups(preprocessed, consensusGroups);
+    this.logger?.info(`[Merge] Final: ${result.length} characters`);
 
-    return median;
+    return result;
   }
 
   /**
    * Single merge operation with specified temperature
-   * Returns null if max retries exceeded
+   * Returns merge groups (0-based indices) or null if max retries exceeded
    */
   private async singleMerge(
     characters: LLMCharacter[],
     temperature: number,
     onProgress?: ProgressCallback
-  ): Promise<LLMCharacter[] | null> {
-    this.logger?.info(`[Merge] Single merge: ${characters.length} characters (temp=${temperature})`);
+  ): Promise<number[][] | null> {
+    this.logger?.info(`[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`);
 
     // Build context for strategy
     const context: MergeContext = { characters };
@@ -623,13 +723,12 @@ export class LLMVoiceService {
 
     // Return null if max retries exceeded
     if (response === null) {
-      this.logger?.warn(`[Merge] Vote failed after ${defaultConfig.llm.maxMergeRetries} retries (temp=${temperature})`);
+      this.logger?.warn(`[Merge] Vote failed after ${defaultConfig.llm.maxMergeRetries} retries (temp=${temperature.toFixed(2)})`);
       return null;
     }
 
-    // Parse and apply response using strategy
-    const parsed = this.mergeStrategy.parseResponse(response, context);
-    return applyMergeResponse(characters, parsed);
+    // Parse response to get merge groups (0-based indices)
+    return this.mergeStrategy.parseResponse(response, context);
   }
 
   /**
