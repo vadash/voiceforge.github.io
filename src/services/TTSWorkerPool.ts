@@ -208,7 +208,7 @@ export class TTSWorkerPool implements IWorkerPool {
           });
         },
         {
-          maxRetries: 10, // Generous retries for "upstream blocking"
+          maxRetries: Infinity, // Never give up - missing chunks would ruin the audiobook
           baseDelay: 2000,
           maxDelay: 30000,
           onRetry: (attempt, err, delay) => {
