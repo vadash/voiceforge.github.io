@@ -101,12 +101,15 @@ function preprocessCharacters(
   logger?: ILogger
 ): LLMCharacter[] {
   const minOccurrence = Math.max(1, Math.floor(totalOccurrences * minOccurrencePercent));
+  const threshold = (minOccurrencePercent * 100).toFixed(2);
+
+  logger?.info(`[Merge] Pre-merge filter: ${characters.length} chars, threshold ${threshold}% (min ${minOccurrence} of ${totalOccurrences} occurrences)`);
 
   const result: LLMCharacter[] = [];
   let maleGeneric: LLMCharacter | null = null;
   let femaleGeneric: LLMCharacter | null = null;
   let unknownGeneric: LLMCharacter | null = null;
-  let removedCount = 0;
+  const removedChars: string[] = [];
 
   for (const char of characters) {
     const key = char.canonicalName.toLowerCase();
@@ -115,7 +118,7 @@ function preprocessCharacters(
     if (count >= minOccurrence) {
       result.push(char);
     } else {
-      removedCount++;
+      removedChars.push(`${char.canonicalName}(${count})`);
       // Map to generic based on gender (create once, reuse)
       if (char.gender === 'male') {
         maleGeneric ??= { canonicalName: 'unknown_male', variations: [], gender: 'male' };
@@ -132,8 +135,11 @@ function preprocessCharacters(
   if (femaleGeneric) result.push(femaleGeneric);
   if (unknownGeneric) result.push(unknownGeneric);
 
-  if (removedCount > 0) {
-    logger?.info(`[Merge] Preprocessed: ${characters.length} → ${result.length} characters (${removedCount} rare chars → generic)`);
+  if (removedChars.length > 0) {
+    logger?.info(`[Merge] Rare voices → generic: ${removedChars.join(', ')}`);
+    logger?.info(`[Merge] After filter: ${result.length} characters (${removedChars.length} rare → generic)`);
+  } else {
+    logger?.info(`[Merge] No rare characters filtered (all have ≥${minOccurrence} occurrences)`);
   }
 
   return result;
@@ -164,10 +170,10 @@ function majorityVote(
 
 /**
  * Build consensus merge groups from multiple votes using Union-Find.
- * Pairs appearing in ≥3 of 5 votes get merged.
+ * Pairs appearing in ≥2 of 5 votes get merged.
  * Returns 0-based index groups.
  */
-function buildMergeConsensus(votes: number[][][]): number[][] {
+function buildMergeConsensus(votes: number[][][], logger?: ILogger): number[][] {
   // Count how many votes have each pair in same group
   const pairCounts = new Map<string, number>();
   // Track which index was "keep" (first in group) for each pair
@@ -192,14 +198,18 @@ function buildMergeConsensus(votes: number[][][]): number[][] {
     }
   }
 
-  // Build edges from pairs with ≥3 votes (majority of 5)
+  // Build edges from pairs with ≥2 votes (2 out of 5 is enough)
   const edges: [number, number][] = [];
+  let pairsWithConsensus = 0;
   for (const [key, count] of pairCounts) {
-    if (count >= 3) {
+    if (count >= 2) {
       const [a, b] = key.split(',').map(Number);
       edges.push([a, b]);
+      pairsWithConsensus++;
     }
   }
+
+  logger?.info(`[Merge] Consensus: ${pairCounts.size} unique pairs, ${pairsWithConsensus} with ≥2 votes`);
 
   // Union-Find to build connected components
   const parent = new Map<number, number>();
@@ -646,7 +656,7 @@ export class LLMVoiceService {
         throw new Error('Operation cancelled');
       }
 
-      const temp = Math.random(); // Random temperature 0.0-1.0
+      const temp = Math.round(Math.random() * 10) / 10; // Random temperature 0.0-1.0, rounded to 0.1
       onProgress?.(i + 1, mergeVoteCount, `Merge vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)})...`);
 
       const mergeGroups = await this.singleMerge(preprocessed, temp, onProgress);
@@ -670,7 +680,7 @@ export class LLMVoiceService {
     }
 
     // Phase 3: Build consensus from all votes
-    const consensusGroups = buildMergeConsensus(votes);
+    const consensusGroups = buildMergeConsensus(votes, this.logger);
     this.logger?.info(`[Merge] Consensus: ${consensusGroups.length} merges from ${votes.length} votes`);
 
     // Apply consensus to preprocessed characters
