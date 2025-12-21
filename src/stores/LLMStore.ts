@@ -60,21 +60,6 @@ interface LLMSettings {
 }
 
 /**
- * Old LLM settings format (for migration)
- */
-interface LegacyLLMSettings {
-  enabled: boolean;
-  apiKey: string;
-  apiUrl: string;
-  model: string;
-  streaming: boolean;
-  reasoning: ReasoningLevel | null;
-  temperature: number;
-  topP: number;
-  useVoting: boolean;
-}
-
-/**
  * Default LLM settings
  */
 const defaultLLMSettings: LLMSettings = {
@@ -310,7 +295,6 @@ export class LLMStore {
 
   /**
    * Load settings from localStorage (async for decryption)
-   * Handles migration from old flat format to new per-stage format
    */
   async loadSettings(): Promise<void> {
     try {
@@ -319,13 +303,6 @@ export class LLMStore {
 
       const settings = JSON.parse(saved);
 
-      // Check if this is old format (has apiKey at root level, not in stages)
-      if ('apiKey' in settings && typeof settings.apiKey === 'string' && !('extract' in settings)) {
-        await this.migrateFromLegacyFormat(settings as LegacyLLMSettings);
-        return;
-      }
-
-      // New format - load per-stage configs
       this.enabled.value = settings.enabled ?? defaultLLMSettings.enabled;
       this.useVoting.value = settings.useVoting ?? defaultLLMSettings.useVoting;
 
@@ -350,37 +327,6 @@ export class LLMStore {
         e instanceof Error ? undefined : { error: String(e) }
       );
     }
-  }
-
-  /**
-   * Migrate from legacy flat format to new per-stage format
-   */
-  private async migrateFromLegacyFormat(legacy: LegacyLLMSettings): Promise<void> {
-    this.logStore.info('Migrating LLM settings from legacy format');
-
-    // Decrypt the single API key
-    const decryptedKey = await decryptValue(legacy.apiKey ?? '', this.logStore);
-
-    // Create stage config from legacy settings
-    const migratedConfig: StageConfig = {
-      apiKey: decryptedKey,
-      apiUrl: legacy.apiUrl ?? defaultStageConfig.apiUrl,
-      model: legacy.model ?? defaultStageConfig.model,
-      streaming: legacy.streaming ?? defaultStageConfig.streaming,
-      reasoning: legacy.reasoning ?? defaultStageConfig.reasoning,
-      temperature: legacy.temperature ?? defaultStageConfig.temperature,
-      topP: legacy.topP ?? defaultStageConfig.topP,
-    };
-
-    // Apply same config to all stages
-    this.enabled.value = legacy.enabled ?? defaultLLMSettings.enabled;
-    this.useVoting.value = legacy.useVoting ?? defaultLLMSettings.useVoting;
-    this.extract.value = { ...migratedConfig };
-    this.merge.value = { ...migratedConfig };
-    this.assign.value = { ...migratedConfig };
-
-    // Save in new format
-    await this.saveSettings();
   }
 }
 

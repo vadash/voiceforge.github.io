@@ -129,6 +129,3 @@ export function useTTSConversion(): UseTTSConversionResult {
     },
   };
 }
-
-// Re-export type for backward compatibility
-export type { ConversionStatus } from '@/stores/ConversionStore';

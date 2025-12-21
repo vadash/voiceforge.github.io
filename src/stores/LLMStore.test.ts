@@ -385,31 +385,5 @@ describe('LLMStore', () => {
       // Should not throw and keep defaults
       expect(store.enabled.value).toBe(true);
     });
-
-    it('migrates from legacy flat format', async () => {
-      // Old format with flat apiKey, apiUrl, model at root level
-      localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({
-        enabled: false,
-        apiKey: 'encrypted:sk-legacy',
-        apiUrl: 'https://legacy.api.com',
-        model: 'gpt-3.5-turbo',
-        streaming: false,
-        reasoning: 'high',
-        temperature: 0.7,
-        topP: 0.9,
-        useVoting: true,
-      }));
-
-      await store.loadSettings();
-
-      // Should migrate to all stages
-      expect(store.enabled.value).toBe(false);
-      expect(store.useVoting.value).toBe(true);
-      expect(store.extract.value.apiKey).toBe('sk-legacy');
-      expect(store.extract.value.apiUrl).toBe('https://legacy.api.com');
-      expect(store.extract.value.model).toBe('gpt-3.5-turbo');
-      expect(store.merge.value.apiKey).toBe('sk-legacy');
-      expect(store.assign.value.apiKey).toBe('sk-legacy');
-    });
   });
 });

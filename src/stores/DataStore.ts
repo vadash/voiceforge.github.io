@@ -18,7 +18,7 @@ export class DataStore {
 
   // Dictionary
   readonly dictionary = signal<DictionaryRule[]>([]);
-  readonly dictionaryRaw = signal<string[]>([]); // Raw lines for backward compatibility
+  readonly dictionaryRaw = signal<string[]>([]); // Raw lines from .lexx files
 
   // File system
   readonly directoryHandle = signal<FileSystemDirectoryHandle | null>(null);

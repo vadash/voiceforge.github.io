@@ -27,17 +27,6 @@ interface ExportData {
   dictionary: string[];
 }
 
-// Legacy format for backward compatibility
-interface LegacyExportData {
-  version: number;
-  settings: AppSettings;
-  llm: {
-    apiUrl: string;
-    model: string;
-  };
-  dictionary: string[];
-}
-
 export function ExportImportTab() {
   const settings = useSettings();
   const llm = useLLM();
@@ -121,22 +110,12 @@ export function ExportImportTab() {
       if (s.lexxRegister !== undefined) settings.setLexxRegister(s.lexxRegister as boolean);
 
       // Import LLM settings (excluding API key)
-      if (importData.llm) {
-        if (importData.version >= 2 && importData.llm.extract) {
-          // New format (version 2+) - per-stage configs
-          importStageConfig('extract', importData.llm.extract);
-          importStageConfig('merge', importData.llm.merge);
-          importStageConfig('assign', importData.llm.assign);
-          if (importData.llm.useVoting !== undefined) {
-            llm.setUseVoting(importData.llm.useVoting);
-          }
-        } else {
-          // Legacy format (version 1) - apply same config to all stages
-          const legacyLlm = importData.llm as LegacyExportData['llm'];
-          for (const stage of ['extract', 'merge', 'assign'] as const) {
-            if (legacyLlm.apiUrl) llm.setStageField(stage, 'apiUrl', legacyLlm.apiUrl);
-            if (legacyLlm.model) llm.setStageField(stage, 'model', legacyLlm.model);
-          }
+      if (importData.llm?.extract) {
+        importStageConfig('extract', importData.llm.extract);
+        importStageConfig('merge', importData.llm.merge);
+        importStageConfig('assign', importData.llm.assign);
+        if (importData.llm.useVoting !== undefined) {
+          llm.setUseVoting(importData.llm.useVoting);
         }
       }
 

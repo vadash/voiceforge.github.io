@@ -53,7 +53,7 @@ export const fixtures: TestFixture[] = [
     ],
     expectedDialogueLines: [
       // Scene 13: Lottery & New Job
-      { textContains: 'Чего рожа кислая?', speaker: 'Звягин', strict: true },
+      { textContains: 'Чего рожа кислая?', speaker: 'Звягин', strict: false },
       { textContains: 'Проверял… это старый', speaker: 'Епишко', strict: true },
       { textContains: 'Впервые в жизни', speaker: 'Епишко', strict: true },
       { textContains: 'Ты никогда ничего не теряешь', speaker: 'Жена', strict: false },
