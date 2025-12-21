@@ -79,73 +79,6 @@ const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
 const LLM_DELAY_MS = 1000;
 
 /**
- * Count occurrences of each character canonical name
- */
-function countCharacterOccurrences(characters: LLMCharacter[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const char of characters) {
-    const key = char.canonicalName.toLowerCase();
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-/**
- * Preprocess characters: filter rare ones (< minOccurrencePercent) and map to generic voices
- */
-function preprocessCharacters(
-  characters: LLMCharacter[],
-  occurrenceCounts: Map<string, number>,
-  totalOccurrences: number,
-  minOccurrencePercent: number,
-  logger?: ILogger
-): LLMCharacter[] {
-  const minOccurrence = Math.max(1, Math.floor(totalOccurrences * minOccurrencePercent));
-  const threshold = (minOccurrencePercent * 100).toFixed(2);
-
-  logger?.info(`[Merge] Pre-merge filter: ${characters.length} chars, threshold ${threshold}% (min ${minOccurrence} of ${totalOccurrences} occurrences)`);
-
-  const result: LLMCharacter[] = [];
-  let maleGeneric: LLMCharacter | null = null;
-  let femaleGeneric: LLMCharacter | null = null;
-  let unknownGeneric: LLMCharacter | null = null;
-  const removedChars: string[] = [];
-
-  for (const char of characters) {
-    const key = char.canonicalName.toLowerCase();
-    const count = occurrenceCounts.get(key) ?? 0;
-
-    if (count >= minOccurrence) {
-      result.push(char);
-    } else {
-      removedChars.push(`${char.canonicalName}(${count})`);
-      // Map to generic based on gender (create once, reuse)
-      if (char.gender === 'male') {
-        maleGeneric ??= { canonicalName: 'unknown_male', variations: [], gender: 'male' };
-      } else if (char.gender === 'female') {
-        femaleGeneric ??= { canonicalName: 'unknown_female', variations: [], gender: 'female' };
-      } else {
-        unknownGeneric ??= { canonicalName: 'unknown', variations: [], gender: 'unknown' };
-      }
-    }
-  }
-
-  // Add generic characters if any rare chars were mapped to them
-  if (maleGeneric) result.push(maleGeneric);
-  if (femaleGeneric) result.push(femaleGeneric);
-  if (unknownGeneric) result.push(unknownGeneric);
-
-  if (removedChars.length > 0) {
-    logger?.info(`[Merge] Rare voices → generic: ${removedChars.join(', ')}`);
-    logger?.info(`[Merge] After filter: ${result.length} characters (${removedChars.length} rare → generic)`);
-  } else {
-    logger?.info(`[Merge] No rare characters filtered (all have ≥${minOccurrence} occurrences)`);
-  }
-
-  return result;
-}
-
-/**
  * Majority vote helper for 3-way voting.
  * Returns the code that appears at least 2 times, or first vote (temp 0.0) as tiebreaker.
  */
@@ -415,15 +348,12 @@ export class LLMVoiceService {
     }
 
     // Simple merge by canonicalName first
-    // Count occurrences before merge (for preprocessing)
-    const occurrenceCounts = countCharacterOccurrences(allCharacters);
-    const totalOccurrences = allCharacters.length;
     let merged = mergeCharacters(allCharacters);
 
     // LLM merge only if multiple blocks were processed and multiple characters exist
     if (blocks.length > 1 && merged.length > 1) {
       onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
-      merged = await this.mergeCharactersWithLLM(merged, occurrenceCounts, totalOccurrences, onProgress);
+      merged = await this.mergeCharactersWithLLM(merged, onProgress);
       onProgress?.(blocks.length, blocks.length, `Merged to ${merged.length} characters`);
     }
 
@@ -620,35 +550,22 @@ export class LLMVoiceService {
 
   /**
    * LLM-based character merge using 5-way voting with consensus
-   * 1. Preprocess: filter rare characters (< 0.05%) to generic voices
-   * 2. Run merge 5x with random temperatures
-   * 3. Build consensus from all votes (pairs with ≥3 votes)
+   * 1. Run merge 5x with random temperatures (0.0-1.0)
+   * 2. Build consensus from all votes (pairs with ≥2 votes)
    */
   private async mergeCharactersWithLLM(
     characters: LLMCharacter[],
-    occurrenceCounts: Map<string, number>,
-    totalOccurrences: number,
     onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> {
-    const { mergeVoteCount, mergeMinOccurrencePercent } = defaultConfig.llm;
+    const { mergeVoteCount } = defaultConfig.llm;
 
-    // Phase 1: Preprocess - filter rare characters
-    const preprocessed = preprocessCharacters(
-      characters,
-      occurrenceCounts,
-      totalOccurrences,
-      mergeMinOccurrencePercent,
-      this.logger
-    );
-
-    // If only generic characters remain, skip LLM merge
-    if (preprocessed.length <= 3) {
-      this.logger?.info(`[Merge] Only ${preprocessed.length} characters after preprocessing, skipping LLM merge`);
-      return preprocessed;
+    // Skip if too few characters
+    if (characters.length <= 1) {
+      return characters;
     }
 
-    // Phase 2: 5-way voting merge with random temperatures
-    this.logger?.info(`[Merge] Starting ${mergeVoteCount}-way voting merge with ${preprocessed.length} characters`);
+    // 5-way voting merge with random temperatures
+    this.logger?.info(`[Merge] Starting ${mergeVoteCount}-way voting merge with ${characters.length} characters`);
     const votes: number[][][] = [];
 
     for (let i = 0; i < mergeVoteCount; i++) {
@@ -659,7 +576,7 @@ export class LLMVoiceService {
       const temp = Math.round(Math.random() * 10) / 10; // Random temperature 0.0-1.0, rounded to 0.1
       onProgress?.(i + 1, mergeVoteCount, `Merge vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)})...`);
 
-      const mergeGroups = await this.singleMerge(preprocessed, temp, onProgress);
+      const mergeGroups = await this.singleMerge(characters, temp, onProgress);
       if (mergeGroups !== null) {
         votes.push(mergeGroups);
         this.logger?.info(`[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}): ${mergeGroups.length} merges`);
@@ -675,16 +592,16 @@ export class LLMVoiceService {
 
     // Need at least 1 successful vote
     if (votes.length === 0) {
-      this.logger?.error(`[Merge] All ${mergeVoteCount} votes failed, returning preprocessed characters`);
-      return preprocessed;
+      this.logger?.error(`[Merge] All ${mergeVoteCount} votes failed, returning original characters`);
+      return characters;
     }
 
-    // Phase 3: Build consensus from all votes
+    // Build consensus from all votes
     const consensusGroups = buildMergeConsensus(votes, this.logger);
     this.logger?.info(`[Merge] Consensus: ${consensusGroups.length} merges from ${votes.length} votes`);
 
-    // Apply consensus to preprocessed characters
-    const result = applyMergeGroups(preprocessed, consensusGroups);
+    // Apply consensus to characters
+    const result = applyMergeGroups(characters, consensusGroups);
     this.logger?.info(`[Merge] Final: ${result.length} characters`);
 
     return result;

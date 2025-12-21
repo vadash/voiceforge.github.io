@@ -56,8 +56,6 @@ export interface LLMConfig {
   maxMergeRetries: number;
   /** Number of merge votes for consensus */
   mergeVoteCount: number;
-  /** Minimum occurrence percent to keep a character (below this → generic voice) */
-  mergeMinOccurrencePercent: number;
 }
 
 export interface RetryConfig {
@@ -134,7 +132,6 @@ export const defaultConfig: AppConfig = {
     maxAssignRetries: 3,
     maxMergeRetries: 5,
     mergeVoteCount: 5,
-    mergeMinOccurrencePercent: 0.0005, // 0.05%
   },
 
   retry: {
