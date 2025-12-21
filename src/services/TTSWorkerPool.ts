@@ -1,18 +1,14 @@
 // TTSWorkerPool - Worker pool using reusable WebSocket connections
-// Uses TTSConnectionPool internally for connection management (including CircuitBreaker)
-// Writes audio chunks to disk immediately to prevent OOM
+// Uses fixed worker array with centralized retry logic
 
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
-import { defaultConfig, getRetryDelay, type TTSConfig } from '@/config';
-import { TTSConnectionPool } from './TTSConnectionPool';
-import { isRetriableError } from '@/errors';
-import { generateConnectionId } from '@/utils/uuid';
+import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
+import { withRetry } from '@/utils/asyncUtils';
 import type { IWorkerPool, PoolTask, WorkerPoolProgress, ILogger } from './interfaces';
 
 export interface WorkerPoolOptions {
   maxWorkers: number;
   config: VoiceConfig;
-  ttsConfig?: TTSConfig;
   directoryHandle?: FileSystemDirectoryHandle | null;
   onStatusUpdate?: (update: StatusUpdate) => void;
   onTaskComplete?: (partIndex: number, filename: string) => void;
@@ -21,39 +17,38 @@ export interface WorkerPoolOptions {
   logger?: ILogger;
 }
 
-interface QueuedTask extends PoolTask {
-  retryCount: number;
+interface WorkerSlot {
+  id: number;
+  service: ReusableEdgeTTSService;
+  isBusy: boolean;
 }
 
 const TEMP_DIR_NAME = '_temp_work';
 
 /**
- * TTSWorkerPool - Uses reusable WebSocket connections
+ * TTSWorkerPool - Uses fixed worker array with reusable WebSocket connections
  *
  * Features:
- * - Uses TTSConnectionPool for connection management (including CircuitBreaker)
- * - Reuses WebSocket connections across multiple requests
+ * - Fixed number of workers (configurable threads)
+ * - Centralized retry logic with exponential backoff
+ * - Handles sleep mode recovery via reconnection
  * - Writes audio chunks to disk immediately to prevent OOM
- * - Reduces rate-limiting by avoiding frequent new connections
  */
 export class TTSWorkerPool implements IWorkerPool {
-  private connectionPool: TTSConnectionPool;
-  private queue: QueuedTask[] = [];
-  private activeTasks: Map<number, QueuedTask> = new Map();
-  private completedAudio: Map<number, string> = new Map();
-  private failedTasks: Set<number> = new Set();
-  private inFlightParts: Set<number> = new Set();
-  private totalTasks = 0;
-  private completedCount = 0;
-  private isProcessingQueue = false;
-  private lastErrorTime = 0;
+  private workers: WorkerSlot[] = [];
+  private taskQueue: PoolTask[] = [];
+  private completedTasks = new Map<number, string>();
+  private failedTasks = new Set<number>();
+  private isProcessing = false;
   private tempDirHandle: FileSystemDirectoryHandle | null = null;
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private initPromise: Promise<void> | null = null;
 
-  private maxWorkers: number;
+  // Statistics
+  private totalTasks = 0;
+  private processedCount = 0;
+
   private voiceConfig: VoiceConfig;
-  private ttsConfig: TTSConfig;
   private onStatusUpdate?: (update: StatusUpdate) => void;
   private onTaskComplete?: (partIndex: number, filename: string) => void;
   private onTaskError?: (partIndex: number, error: Error) => void;
@@ -61,9 +56,7 @@ export class TTSWorkerPool implements IWorkerPool {
   private logger?: ILogger;
 
   constructor(options: WorkerPoolOptions) {
-    this.maxWorkers = options.maxWorkers;
     this.voiceConfig = options.config;
-    this.ttsConfig = options.ttsConfig ?? defaultConfig.tts;
     this.directoryHandle = options.directoryHandle ?? null;
     this.onStatusUpdate = options.onStatusUpdate;
     this.onTaskComplete = options.onTaskComplete;
@@ -71,10 +64,14 @@ export class TTSWorkerPool implements IWorkerPool {
     this.onAllComplete = options.onAllComplete;
     this.logger = options.logger;
 
-    this.connectionPool = new TTSConnectionPool({
-      maxConnections: this.maxWorkers,
-      logger: this.logger,
-    });
+    // Initialize fixed number of workers (configurable threads)
+    for (let i = 0; i < options.maxWorkers; i++) {
+      this.workers.push({
+        id: i,
+        service: new ReusableEdgeTTSService(this.logger),
+        isBusy: false,
+      });
+    }
 
     // Initialize temp directory asynchronously
     this.initPromise = this.initTempDirectory();
@@ -89,7 +86,9 @@ export class TTSWorkerPool implements IWorkerPool {
     }
 
     try {
-      this.tempDirHandle = await this.directoryHandle.getDirectoryHandle(TEMP_DIR_NAME, { create: true });
+      this.tempDirHandle = await this.directoryHandle.getDirectoryHandle(TEMP_DIR_NAME, {
+        create: true,
+      });
       this.logger?.debug(`Created temp directory: ${TEMP_DIR_NAME}`);
     } catch (err) {
       this.logger?.error(`Failed to create temp directory: ${(err as Error).message}`);
@@ -121,26 +120,35 @@ export class TTSWorkerPool implements IWorkerPool {
    * Pre-warm connections before adding tasks
    */
   async warmup(): Promise<void> {
-    await this.connectionPool.warmup(this.maxWorkers);
+    const promises = this.workers.map(async (worker) => {
+      try {
+        await worker.service.connect();
+      } catch {
+        // Ignore warmup errors - will retry on actual task
+      }
+    });
+    await Promise.allSettled(promises);
+    this.logger?.debug(`Warmed up ${this.workers.length} workers`);
   }
 
   addTask(task: PoolTask): void {
-    this.queue.push({ ...task, retryCount: 0 });
+    this.taskQueue.push(task);
     this.totalTasks++;
     this.processQueue();
   }
 
   addTasks(tasks: PoolTask[]): void {
-    for (const task of tasks) {
-      this.queue.push({ ...task, retryCount: 0 });
-      this.totalTasks++;
-    }
+    this.taskQueue.push(...tasks);
+    this.totalTasks += tasks.length;
     this.processQueue();
   }
 
+  /**
+   * Main loop: Finds idle workers and assigns tasks
+   */
   private async processQueue(): Promise<void> {
-    if (this.isProcessingQueue) return;
-    this.isProcessingQueue = true;
+    if (this.isProcessing) return;
+    this.isProcessing = true;
 
     // Wait for temp directory initialization
     if (this.initPromise) {
@@ -148,138 +156,112 @@ export class TTSWorkerPool implements IWorkerPool {
       this.initPromise = null;
     }
 
-    while (this.inFlightParts.size < this.maxWorkers && this.queue.length > 0) {
-      // Check circuit breaker status (handled by TTSConnectionPool)
-      const poolStats = this.connectionPool.getStats();
-      if (poolStats.circuitState === 'OPEN') {
-        const waitTime = Math.min(10000, 5000); // Wait up to 10s before checking again
-        this.onStatusUpdate?.({
-          partIndex: -1,
-          message: `Rate limited (circuit breaker open) - waiting...`,
-          isComplete: false,
-        });
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-        continue;
+    // While we have tasks and free workers
+    while (this.taskQueue.length > 0) {
+      const freeWorker = this.workers.find((w) => !w.isBusy);
+
+      if (!freeWorker) {
+        // No threads available. Stop loop.
+        // The loop will restart when a worker finishes and calls processQueue()
+        break;
       }
 
-      // Check error cooldown
-      const timeSinceError = Date.now() - this.lastErrorTime;
-      if (this.lastErrorTime > 0 && timeSinceError < this.ttsConfig.errorCooldown) {
-        const waitTime = this.ttsConfig.errorCooldown - timeSinceError;
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-      }
-
-      const task = this.queue.shift()!;
-      this.processTask(task);
+      const task = this.taskQueue.shift()!;
+      this.executeTask(freeWorker, task);
     }
 
-    this.isProcessingQueue = false;
+    this.isProcessing = false;
   }
 
-  private async processTask(task: QueuedTask): Promise<void> {
-    this.activeTasks.set(task.partIndex, task);
-    if (task.retryCount === 0) {
-      this.inFlightParts.add(task.partIndex);
-    }
-
-    this.onStatusUpdate?.({
-      partIndex: task.partIndex,
-      message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Processing...`,
-      isComplete: false,
-    });
-
-    // Build config with task-specific voice
-    const taskConfig: VoiceConfig = task.voice
-      ? { ...this.voiceConfig, voice: `Microsoft Server Speech Text to Speech Voice (${task.voice})` }
-      : this.voiceConfig;
+  /**
+   * Executes a single task on a specific worker with retry logic
+   */
+  private async executeTask(worker: WorkerSlot, task: PoolTask): Promise<void> {
+    worker.isBusy = true;
 
     try {
-      const audioData = await this.connectionPool.execute({
-        text: task.text,
-        config: taskConfig,
-        requestId: generateConnectionId(),
+      this.onStatusUpdate?.({
+        partIndex: task.partIndex,
+        message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Processing...`,
+        isComplete: false,
       });
 
-      // Write to disk immediately
+      // Build config with task-specific voice
+      const taskConfig: VoiceConfig = task.voice
+        ? { ...this.voiceConfig, voice: `Microsoft Server Speech Text to Speech Voice (${task.voice})` }
+        : this.voiceConfig;
+
+      // === CENTRALIZED RETRY LOGIC ===
+      // This handles: Sleep mode disconnects, Rate limits, Network drops
+      const audioData = await withRetry(
+        async () => {
+          // Ensure connected (Reusable service handles idempotency)
+          // If PC slept, state is likely disconnected, this reconnects.
+          if (!worker.service.isReady()) {
+            await worker.service.connect();
+          }
+
+          // Send request
+          return await worker.service.send({
+            text: task.text,
+            config: taskConfig,
+          });
+        },
+        {
+          maxRetries: 10, // Generous retries for "upstream blocking"
+          baseDelay: 2000,
+          maxDelay: 30000,
+          onRetry: (attempt, err, delay) => {
+            this.logger?.warn(
+              `Worker ${worker.id} retrying task ${task.partIndex} (Attempt ${attempt}). Waiting ${Math.round(delay)}ms. Error: ${err}`
+            );
+
+            this.onStatusUpdate?.({
+              partIndex: task.partIndex,
+              message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Retry ${attempt}...`,
+              isComplete: false,
+            });
+
+            // Force disconnect on error to ensure clean state for next attempt
+            worker.service.disconnect();
+          },
+        }
+      );
+
+      // Save to disk
       const filename = await this.writeChunkToDisk(task.partIndex, audioData);
-      this.handleTaskComplete(task.partIndex, filename);
+
+      this.completedTasks.set(task.partIndex, filename);
+      this.processedCount++;
+
+      this.onStatusUpdate?.({
+        partIndex: task.partIndex,
+        message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Complete`,
+        isComplete: true,
+      });
+
+      this.onTaskComplete?.(task.partIndex, filename);
     } catch (error) {
-      this.handleTaskError(task.partIndex, error as Error, task.retryCount);
-    }
-  }
+      this.failedTasks.add(task.partIndex);
+      this.processedCount++;
+      this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
+      this.logger?.error(`Task ${task.partIndex} failed permanently`, error as Error);
+    } finally {
+      // Free the worker
+      worker.isBusy = false;
 
-  private handleTaskComplete(partIndex: number, filename: string): void {
-    this.activeTasks.delete(partIndex);
-    this.inFlightParts.delete(partIndex);
-    this.completedAudio.set(partIndex, filename);
-    this.completedCount++;
-
-    this.onStatusUpdate?.({
-      partIndex,
-      message: `Part ${String(partIndex + 1).padStart(4, '0')}: Complete`,
-      isComplete: true,
-    });
-
-    this.onTaskComplete?.(partIndex, filename);
-    this.checkCompletion();
-    this.processQueue();
-  }
-
-  private handleTaskError(partIndex: number, error: Error, retryCount: number): void {
-    this.lastErrorTime = Date.now();
-
-    const task = this.activeTasks.get(partIndex);
-    this.activeTasks.delete(partIndex);
-
-    if (task) {
-      // Retriable errors trigger automatic retry with exponential backoff
-      if (isRetriableError(error)) {
-        const delay = getRetryDelay(retryCount);
-        const delaySec = Math.round(delay / 1000);
-
-        this.onStatusUpdate?.({
-          partIndex,
-          message: `Part ${String(partIndex + 1).padStart(4, '0')}: Error, retrying in ${delaySec}s...`,
-          isComplete: false,
-        });
-
-        setTimeout(() => {
-          this.queue.push({ ...task, retryCount: retryCount + 1 });
-          this.processQueue();
-        }, delay);
+      // Check for all complete
+      if (this.taskQueue.length === 0 && this.workers.every((w) => !w.isBusy)) {
+        this.onAllComplete?.();
       } else {
-        // Non-retriable error - still retry but log warning
-        const delay = getRetryDelay(retryCount);
-        const delaySec = Math.round(delay / 1000);
-
-        this.logger?.warn(`Task ${partIndex} failed with non-retriable error: ${error.message}`);
-
-        this.onStatusUpdate?.({
-          partIndex,
-          message: `Part ${String(partIndex + 1).padStart(4, '0')}: Error, retrying in ${delaySec}s...`,
-          isComplete: false,
-        });
-
-        setTimeout(() => {
-          this.queue.push({ ...task, retryCount: retryCount + 1 });
-          this.processQueue();
-        }, delay);
+        // Trigger next task
+        this.processQueue();
       }
-    }
-  }
-
-  private checkCompletion(): void {
-    if (
-      this.completedCount >= this.totalTasks &&
-      this.queue.length === 0 &&
-      this.activeTasks.size === 0
-    ) {
-      this.onAllComplete?.();
     }
   }
 
   getCompletedAudio(): Map<number, string> {
-    return new Map(this.completedAudio);
+    return new Map(this.completedTasks);
   }
 
   getFailedTasks(): Set<number> {
@@ -288,7 +270,7 @@ export class TTSWorkerPool implements IWorkerPool {
 
   getProgress(): WorkerPoolProgress {
     return {
-      completed: this.completedCount,
+      completed: this.processedCount,
       total: this.totalTasks,
       failed: this.failedTasks.size,
     };
@@ -299,10 +281,21 @@ export class TTSWorkerPool implements IWorkerPool {
   }
 
   /**
-   * Get connection pool statistics
+   * Get pool statistics
    */
   getPoolStats(): { total: number; ready: number; busy: number; disconnected: number } {
-    return this.connectionPool.getStats();
+    let ready = 0;
+    let busy = 0;
+    let disconnected = 0;
+
+    for (const worker of this.workers) {
+      const state = worker.service.getState();
+      if (state === 'READY' && !worker.isBusy) ready++;
+      else if (state === 'BUSY' || worker.isBusy) busy++;
+      else if (state === 'DISCONNECTED') disconnected++;
+    }
+
+    return { total: this.workers.length, ready, busy, disconnected };
   }
 
   /**
@@ -321,13 +314,14 @@ export class TTSWorkerPool implements IWorkerPool {
   }
 
   clear(): void {
-    this.connectionPool.shutdown();
-    this.queue = [];
-    this.activeTasks.clear();
-    this.completedAudio.clear();
+    this.taskQueue = [];
+    this.workers.forEach((w) => {
+      w.isBusy = false;
+      w.service.disconnect();
+    });
+    this.completedTasks.clear();
     this.failedTasks.clear();
-    this.inFlightParts.clear();
     this.totalTasks = 0;
-    this.completedCount = 0;
+    this.processedCount = 0;
   }
 }

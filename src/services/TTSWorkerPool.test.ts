@@ -4,27 +4,31 @@ import type { PoolTask } from './interfaces';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/pipeline/helpers';
 
-// Mock the TTSConnectionPool
-vi.mock('./TTSConnectionPool', () => {
+// Mock the ReusableEdgeTTSService
+vi.mock('./ReusableEdgeTTSService', () => {
   return {
-    TTSConnectionPool: vi.fn().mockImplementation(() => ({
-      execute: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-      warmup: vi.fn().mockResolvedValue(undefined),
-      shutdown: vi.fn(),
-      getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+    ReusableEdgeTTSService: vi.fn().mockImplementation(() => ({
+      connect: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      disconnect: vi.fn(),
+      isReady: vi.fn().mockReturnValue(true),
+      getState: vi.fn().mockReturnValue('READY'),
     })),
   };
 });
 
 // Get the mocked class for access in tests
-import { TTSConnectionPool } from './TTSConnectionPool';
-const MockedTTSConnectionPool = vi.mocked(TTSConnectionPool);
+import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
+const MockedReusableEdgeTTSService = vi.mocked(ReusableEdgeTTSService);
 
 describe('TTSWorkerPool', () => {
   let pool: TTSWorkerPool;
   let defaultOptions: WorkerPoolOptions;
   let defaultVoiceConfig: VoiceConfig;
-  let mockExecute: ReturnType<typeof vi.fn>;
+  let mockSend: ReturnType<typeof vi.fn>;
+  let mockConnect: ReturnType<typeof vi.fn>;
+  let mockDisconnect: ReturnType<typeof vi.fn>;
+  let mockIsReady: ReturnType<typeof vi.fn>;
   let mockDirectoryHandle: FileSystemDirectoryHandle;
 
   beforeEach(() => {
@@ -34,14 +38,18 @@ describe('TTSWorkerPool', () => {
     // Create mock directory handle
     mockDirectoryHandle = createMockDirectoryHandle();
 
-    // Get a fresh mock execute function for each test
-    mockExecute = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
+    // Get fresh mock functions for each test
+    mockSend = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
+    mockConnect = vi.fn().mockResolvedValue(undefined);
+    mockDisconnect = vi.fn();
+    mockIsReady = vi.fn().mockReturnValue(true);
 
-    MockedTTSConnectionPool.mockImplementation(() => ({
-      execute: mockExecute,
-      warmup: vi.fn().mockResolvedValue(undefined),
-      shutdown: vi.fn(),
-      getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+    MockedReusableEdgeTTSService.mockImplementation(() => ({
+      connect: mockConnect,
+      send: mockSend,
+      disconnect: mockDisconnect,
+      isReady: mockIsReady,
+      getState: vi.fn().mockReturnValue('READY'),
     }));
 
     defaultVoiceConfig = {
@@ -54,13 +62,6 @@ describe('TTSWorkerPool', () => {
       maxWorkers: 3,
       config: defaultVoiceConfig,
       directoryHandle: mockDirectoryHandle,
-      ttsConfig: {
-        maxRetries: 3,
-        baseRetryDelay: 100,
-        maxRetryDelay: 1000,
-        errorCooldown: 500,
-        workerStartDelay: 50,
-      },
     };
   });
 
@@ -87,13 +88,13 @@ describe('TTSWorkerPool', () => {
       expect(pool.getProgress().total).toBe(1);
     });
 
-    it('processes task through connection pool', async () => {
+    it('processes task through worker', async () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(mockExecute).toHaveBeenCalledTimes(1);
+      expect(mockSend).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -106,19 +107,20 @@ describe('TTSWorkerPool', () => {
     });
 
     it('respects maxWorkers limit', async () => {
-      // Create execute that doesn't resolve immediately
+      // Create send that doesn't resolve immediately
       let resolvers: Array<(value: Uint8Array) => void> = [];
-      mockExecute = vi.fn().mockImplementation(() => {
+      mockSend = vi.fn().mockImplementation(() => {
         return new Promise<Uint8Array>((resolve) => {
           resolvers.push(resolve);
         });
       });
 
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: vi.fn().mockResolvedValue(undefined),
-        shutdown: vi.fn(),
-        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
       }));
 
       pool = createPool({ maxWorkers: 2 });
@@ -128,7 +130,7 @@ describe('TTSWorkerPool', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       // Should only start 2 tasks (maxWorkers limit)
-      expect(mockExecute).toHaveBeenCalledTimes(2);
+      expect(mockSend).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -179,39 +181,40 @@ describe('TTSWorkerPool', () => {
 
     it('processes next task from queue after completion', async () => {
       let resolvers: Array<(value: Uint8Array) => void> = [];
-      mockExecute = vi.fn().mockImplementation(() => {
+      mockSend = vi.fn().mockImplementation(() => {
         return new Promise<Uint8Array>((resolve) => {
           resolvers.push(resolve);
         });
       });
 
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: vi.fn().mockResolvedValue(undefined),
-        shutdown: vi.fn(),
-        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
       }));
 
       pool = createPool({ maxWorkers: 1 });
       pool.addTasks([createTask(0), createTask(1)]);
 
       await vi.advanceTimersByTimeAsync(50);
-      expect(mockExecute).toHaveBeenCalledTimes(1);
+      expect(mockSend).toHaveBeenCalledTimes(1);
 
       // Complete first task
       resolvers[0](new Uint8Array([1]));
       await vi.advanceTimersByTimeAsync(50);
 
-      expect(mockExecute).toHaveBeenCalledTimes(2);
+      expect(mockSend).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('task errors and retries', () => {
-    it('retries failed tasks', async () => {
+    it('retries failed tasks with exponential backoff', async () => {
       let attemptCount = 0;
       const { RetriableError } = await import('@/errors');
 
-      mockExecute = vi.fn().mockImplementation(() => {
+      mockSend = vi.fn().mockImplementation(() => {
         attemptCount++;
         if (attemptCount < 3) {
           return Promise.reject(new RetriableError('Network error'));
@@ -219,19 +222,20 @@ describe('TTSWorkerPool', () => {
         return Promise.resolve(new Uint8Array([1]));
       });
 
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: vi.fn().mockResolvedValue(undefined),
-        shutdown: vi.fn(),
-        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
       }));
 
       pool = createPool();
       pool.addTask(createTask(0));
 
       // Run through retries with exponential backoff
-      // Default retry delays are [10000, 20000, ...], so we need at least 30000ms for 3 attempts
-      await vi.advanceTimersByTimeAsync(35000);
+      // Base delay is 2000ms: 2000, 4000, ... so we need ~7000ms for 3 attempts with jitter
+      await vi.advanceTimersByTimeAsync(10000);
 
       expect(attemptCount).toBe(3);
       expect(pool.getCompletedAudio().size).toBe(1);
@@ -241,59 +245,63 @@ describe('TTSWorkerPool', () => {
       const onStatusUpdate = vi.fn();
       const { RetriableError } = await import('@/errors');
 
-      mockExecute = vi.fn().mockRejectedValue(new RetriableError('Error'));
+      let attemptCount = 0;
+      mockSend = vi.fn().mockImplementation(() => {
+        attemptCount++;
+        if (attemptCount === 1) {
+          return Promise.reject(new RetriableError('Error'));
+        }
+        return Promise.resolve(new Uint8Array([1]));
+      });
 
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: vi.fn().mockResolvedValue(undefined),
-        shutdown: vi.fn(),
-        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
       }));
 
       pool = createPool({ onStatusUpdate });
       pool.addTask(createTask(0));
 
-      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(5000);
 
-      expect(onStatusUpdate).toHaveBeenCalledWith(expect.objectContaining({
-        partIndex: 0,
-        message: expect.stringContaining('Error, retrying'),
-      }));
+      expect(onStatusUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          partIndex: 0,
+          message: expect.stringContaining('Retry'),
+        })
+      );
     });
 
-    it('respects error cooldown', async () => {
-      const createTimes: number[] = [];
+    it('disconnects worker on retry to force reconnection', async () => {
       const { RetriableError } = await import('@/errors');
 
-      mockExecute = vi.fn().mockImplementation(() => {
-        createTimes.push(Date.now());
-        return Promise.reject(new RetriableError('Error'));
+      let attemptCount = 0;
+      mockSend = vi.fn().mockImplementation(() => {
+        attemptCount++;
+        if (attemptCount === 1) {
+          return Promise.reject(new RetriableError('Error'));
+        }
+        return Promise.resolve(new Uint8Array([1]));
       });
 
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: vi.fn().mockResolvedValue(undefined),
-        shutdown: vi.fn(),
-        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
       }));
 
-      pool = createPool({
-        maxWorkers: 2,
-        ttsConfig: {
-          ...defaultOptions.ttsConfig!,
-          errorCooldown: 200,
-        },
-      });
+      pool = createPool();
+      pool.addTask(createTask(0));
 
-      pool.addTasks([createTask(0), createTask(1)]);
+      await vi.advanceTimersByTimeAsync(5000);
 
-      await vi.advanceTimersByTimeAsync(500);
-
-      // Second task should be delayed due to error cooldown
-      if (createTimes.length >= 2) {
-        const timeDiff = createTimes[1] - createTimes[0];
-        expect(timeDiff).toBeGreaterThanOrEqual(0);
-      }
+      // Disconnect should be called when retry happens
+      expect(mockDisconnect).toHaveBeenCalled();
     });
   });
 
@@ -309,11 +317,13 @@ describe('TTSWorkerPool', () => {
 
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
-        config: expect.objectContaining({
-          voice: expect.stringContaining('ru-RU, DmitryNeural'),
-        }),
-      }));
+      expect(mockSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            voice: expect.stringContaining('ru-RU, DmitryNeural'),
+          }),
+        })
+      );
     });
 
     it('uses default voice when task has no override', async () => {
@@ -322,11 +332,13 @@ describe('TTSWorkerPool', () => {
 
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
-        config: expect.objectContaining({
-          voice: defaultVoiceConfig.voice,
-        }),
-      }));
+      expect(mockSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            voice: defaultVoiceConfig.voice,
+          }),
+        })
+      );
     });
   });
 
@@ -341,10 +353,12 @@ describe('TTSWorkerPool', () => {
 
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(statusUpdates).toContainEqual(expect.objectContaining({
-        partIndex: 0,
-        message: expect.stringContaining('Processing'),
-      }));
+      expect(statusUpdates).toContainEqual(
+        expect.objectContaining({
+          partIndex: 0,
+          message: expect.stringContaining('Processing'),
+        })
+      );
     });
   });
 
@@ -416,15 +430,7 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('clear', () => {
-    it('clears all state and shuts down connection pool', async () => {
-      const mockShutdown = vi.fn();
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: vi.fn().mockResolvedValue(undefined),
-        shutdown: mockShutdown,
-        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
-      }));
-
+    it('clears all state and disconnects workers', async () => {
       pool = createPool();
       pool.addTasks([createTask(0), createTask(1)]);
 
@@ -432,7 +438,7 @@ describe('TTSWorkerPool', () => {
 
       pool.clear();
 
-      expect(mockShutdown).toHaveBeenCalled();
+      expect(mockDisconnect).toHaveBeenCalled();
       expect(pool.getProgress()).toEqual({
         completed: 0,
         total: 0,
@@ -444,35 +450,95 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('warmup', () => {
-    it('warms up connection pool', async () => {
-      const mockWarmup = vi.fn().mockResolvedValue(undefined);
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: mockWarmup,
-        shutdown: vi.fn(),
-        getStats: vi.fn().mockReturnValue({ total: 0, ready: 0, busy: 0, disconnected: 0 }),
-      }));
-
+    it('warms up all workers by connecting them', async () => {
       pool = createPool({ maxWorkers: 5 });
       await pool.warmup();
 
-      expect(mockWarmup).toHaveBeenCalledWith(5);
+      // Each worker should have attempted to connect
+      expect(mockConnect).toHaveBeenCalledTimes(5);
+    });
+
+    it('ignores connection errors during warmup', async () => {
+      mockConnect = vi.fn().mockRejectedValue(new Error('Connection failed'));
+
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('DISCONNECTED'),
+      }));
+
+      pool = createPool({ maxWorkers: 3 });
+
+      // Should not throw
+      await expect(pool.warmup()).resolves.toBeUndefined();
     });
   });
 
   describe('getPoolStats', () => {
-    it('returns connection pool stats', () => {
-      const mockStats = { total: 3, ready: 2, busy: 1, disconnected: 0 };
-      MockedTTSConnectionPool.mockImplementation(() => ({
-        execute: mockExecute,
-        warmup: vi.fn().mockResolvedValue(undefined),
-        shutdown: vi.fn(),
-        getStats: vi.fn().mockReturnValue(mockStats),
+    it('returns worker statistics', () => {
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
+      }));
+
+      pool = createPool({ maxWorkers: 3 });
+
+      const stats = pool.getPoolStats();
+
+      expect(stats).toEqual({
+        total: 3,
+        ready: 3,
+        busy: 0,
+        disconnected: 0,
+      });
+    });
+  });
+
+  describe('connection handling', () => {
+    it('connects worker if not ready before sending', async () => {
+      mockIsReady = vi.fn().mockReturnValue(false);
+
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('DISCONNECTED'),
       }));
 
       pool = createPool();
+      pool.addTask(createTask(0));
 
-      expect(pool.getPoolStats()).toEqual(mockStats);
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockConnect).toHaveBeenCalled();
+      expect(mockSend).toHaveBeenCalled();
+    });
+
+    it('skips connect if worker already ready', async () => {
+      mockIsReady = vi.fn().mockReturnValue(true);
+
+      MockedReusableEdgeTTSService.mockImplementation(() => ({
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
+      }));
+
+      pool = createPool();
+      pool.addTask(createTask(0));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Connect should not be called if already ready
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(mockSend).toHaveBeenCalled();
     });
   });
 });
