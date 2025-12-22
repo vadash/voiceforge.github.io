@@ -47,7 +47,8 @@ export interface IndexMergeResponse {
 /**
  * Validate Merge response (index-based format)
  * Format: {"merges": [[keepIdx, absorbIdx1, absorbIdx2], ...]}
- * Indices are 1-based matching input list
+ * Indices are 0-based matching input list (0 to N-1)
+ * Single-element groups are auto-filtered (tolerate LLM mistakes)
  */
 export function validateMergeResponse(response: string, characters: LLMCharacter[]): LLMValidationResult {
   const errors: string[] = [];
@@ -64,24 +65,17 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
 
     const usedIndices = new Set<number>();
 
-    for (let i = 0; i < parsed.merges.length; i++) {
-      const group = parsed.merges[i];
+    // Auto-filter single-element groups (tolerate LLM mistakes)
+    const validGroups = parsed.merges.filter(g => Array.isArray(g) && g.length >= 2);
 
-      if (!Array.isArray(group)) {
-        errors.push(`Merge ${i}: group must be an array`);
-        continue;
-      }
-
-      if (group.length < 2) {
-        errors.push(`Merge ${i}: group must have at least 2 indices`);
-        continue;
-      }
+    for (let i = 0; i < validGroups.length; i++) {
+      const group = validGroups[i];
 
       for (const idx of group) {
         if (typeof idx !== 'number' || !Number.isInteger(idx)) {
           errors.push(`Merge ${i}: index "${idx}" is not an integer`);
-        } else if (idx < 1 || idx > charCount) {
-          errors.push(`Merge ${i}: index ${idx} out of range [1-${charCount}]`);
+        } else if (idx < 0 || idx >= charCount) {
+          errors.push(`Merge ${i}: index ${idx} out of range [0-${charCount - 1}]`);
         } else if (usedIndices.has(idx)) {
           errors.push(`Merge ${i}: duplicate index ${idx}`);
         } else {
@@ -98,13 +92,14 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
 
 /**
  * Parse merge response and return merge groups (0-based indices)
+ * Also filters out single-element groups
  */
 export function parseMergeResponse(response: string): number[][] {
   try {
     const cleaned = extractJSON(response);
     const parsed = JSON.parse(cleaned) as IndexMergeResponse;
-    // Convert 1-based to 0-based indices
-    return (parsed.merges || []).map(group => group.map(idx => idx - 1));
+    // Filter out single-element groups, indices already 0-based
+    return (parsed.merges || []).filter(group => Array.isArray(group) && group.length >= 2);
   } catch {
     return [];
   }

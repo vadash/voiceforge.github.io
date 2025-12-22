@@ -1017,14 +1017,14 @@ You MUST output ONLY valid JSON. No markdown. No explanations.
 
 **FIELD DEFINITIONS:**
 - **merges**: Array of merge groups (empty [] if no merges needed)
-- Each group is an array of character indices (1-based, matching input list numbers)
+- Each group is an array of character indices (0-based, matching input list numbers)
 - **First index** in each group = the "keep" character (canonical name to preserve)
 - **Remaining indices** = characters absorbed into the keep
 - Characters NOT listed in any group are automatically unchanged (no need to list them)
 
 **CRITICAL VALIDATION:**
 - Each index must appear in AT MOST one group
-- Indices must be valid (1 to N where N = number of input characters)
+- Indices must be valid (0 to N-1 where N = number of input characters)
 - Groups must have at least 2 indices (single characters need no group)
 </output_format>
 
@@ -1032,62 +1032,62 @@ You MUST output ONLY valid JSON. No markdown. No explanations.
 
 **Example 1: No Merges Needed**
 Input characters:
-1. canonicalName: "John"
-2. canonicalName: "Mary"
-3. canonicalName: "System"
+0. canonicalName: "John"
+1. canonicalName: "Mary"
+2. canonicalName: "System"
 Output:
 {"merges": []}
 
 **Example 2: Protagonist Merge**
 Input characters:
-1. canonicalName: "Protagonist"
-2. canonicalName: "Elena"
-3. canonicalName: "Guard"
+0. canonicalName: "Protagonist"
+1. canonicalName: "Elena"
+2. canonicalName: "Guard"
 (Elena is the protagonist)
 Output:
-{"merges": [[2, 1]]}
-(Keep Elena at index 2, absorb Protagonist at index 1)
+{"merges": [[1, 0]]}
+(Keep Elena at index 1, absorb Protagonist at index 0)
 
 **Example 3: System Unification**
 Input characters:
-1. canonicalName: "System"
-2. canonicalName: "Interface"
-3. canonicalName: "Blue Box"
-4. canonicalName: "Sarah"
+0. canonicalName: "System"
+1. canonicalName: "Interface"
+2. canonicalName: "Blue Box"
+3. canonicalName: "Sarah"
 Output:
-{"merges": [[1, 2, 3]]}
-(Keep System at index 1, absorb Interface and Blue Box)
+{"merges": [[0, 1, 2]]}
+(Keep System at index 0, absorb Interface and Blue Box)
 
 **Example 4: Multiple Merges**
 Input characters:
-1. canonicalName: "Protagonist"
-2. canonicalName: "Jason"
-3. canonicalName: "System"
-4. canonicalName: "Interface"
-5. canonicalName: "The King"
-6. canonicalName: "Ranvar"
-7. canonicalName: "Sarah"
-8. canonicalName: "The Guard"
+0. canonicalName: "Protagonist"
+1. canonicalName: "Jason"
+2. canonicalName: "System"
+3. canonicalName: "Interface"
+4. canonicalName: "The King"
+5. canonicalName: "Ranvar"
+6. canonicalName: "Sarah"
+7. canonicalName: "The Guard"
 Output:
-{"merges": [[2, 1], [3, 4], [6, 5]]}
+{"merges": [[1, 0], [2, 3], [5, 4]]}
 (Jason absorbs Protagonist, System absorbs Interface, Ranvar absorbs The King)
 
 **Example 5: Title and Name Merge**
 Input characters:
-1. canonicalName: "The Dark Lord"
-2. canonicalName: "Azaroth"
-3. canonicalName: "The Hero"
-4. canonicalName: "Elena"
-5. canonicalName: "System"
+0. canonicalName: "The Dark Lord"
+1. canonicalName: "Azaroth"
+2. canonicalName: "The Hero"
+3. canonicalName: "Elena"
+4. canonicalName: "System"
 Output:
-{"merges": [[2, 1], [4, 3]]}
+{"merges": [[1, 0], [3, 2]]}
 (Azaroth absorbs The Dark Lord, Elena absorbs The Hero)
 
 **Example 6: No Merge - Different People**
 Input characters:
-1. canonicalName: "The King"
-2. canonicalName: "The Prince"
-3. canonicalName: "The Queen"
+0. canonicalName: "The King"
+1. canonicalName: "The Prince"
+2. canonicalName: "The Queen"
 (These are different people - do not merge)
 Output:
 {"merges": []}
@@ -1103,7 +1103,7 @@ Before outputting, verify:
 
 □ All duplicate characters are identified and merged
 □ First index in each group is the most specific proper name
-□ Indices are valid (1 to N)
+□ Indices are valid (0 to N-1)
 □ No index appears in multiple groups
 □ Gender resolution will use first non-unknown from merged characters
 □ System variants are unified (pick System index first)
@@ -1115,7 +1115,7 @@ Before outputting, verify:
 <critical_warning>
 **INDICES MUST BE VALID!**
 
-- Use 1-based indices matching the input list numbers
+- Use 0-based indices matching the input list numbers
 - First index in group = the character to KEEP
 - Remaining indices = characters to ABSORB into keep
 - Characters not in any group remain unchanged automatically
