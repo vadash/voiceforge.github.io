@@ -23,7 +23,7 @@ export interface TTSConversionStepOptions {
 export class TTSConversionStep extends BasePipelineStep {
   readonly name = 'tts-conversion';
   protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['assignments', 'directoryHandle'];
-  readonly dropsContextKeys: (keyof PipelineContext)[] = ['text', 'dictionaryRules', 'assignments', 'characters'];
+  readonly dropsContextKeys: (keyof PipelineContext)[] = ['text', 'dictionaryRules'];
 
   private workerPool: IWorkerPool | null = null;
 

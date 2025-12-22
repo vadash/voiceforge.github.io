@@ -3,7 +3,7 @@
 
 import { BasePipelineStep, PipelineContext } from '../types';
 import type { IAudioMerger, MergerConfig } from '@/services/interfaces';
-import { exportToJSON } from '@/services/VoiceMappingService';
+import { exportToJSONSorted } from '@/services/VoiceMappingService';
 
 /**
  * Options for SaveStep
@@ -19,7 +19,7 @@ export interface SaveStepOptions {
 export class SaveStep extends BasePipelineStep {
   readonly name = 'save';
   protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
-  readonly dropsContextKeys: (keyof PipelineContext)[] = ['mergedFiles'];
+  readonly dropsContextKeys: (keyof PipelineContext)[] = ['mergedFiles', 'assignments', 'characters'];
 
   constructor(private options: SaveStepOptions) {
     super();
@@ -28,7 +28,7 @@ export class SaveStep extends BasePipelineStep {
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
 
-    const { mergedFiles, directoryHandle, characters, voiceMap, fileNames } = context;
+    const { mergedFiles, directoryHandle, characters, voiceMap, assignments, fileNames } = context;
 
     if (!mergedFiles || mergedFiles.length === 0) {
       this.reportProgress(1, 1, 'No files to save');
@@ -49,18 +49,21 @@ export class SaveStep extends BasePipelineStep {
     await merger.saveMergedFiles(mergedFiles, directoryHandle);
 
     // Save voice mapping JSON if we have character data and a directory
-    if (directoryHandle && characters && voiceMap) {
+    if (directoryHandle && characters && voiceMap && assignments) {
       try {
         const bookName = this.extractBookName(fileNames);
-        const json = exportToJSON(characters, voiceMap, this.options.narratorVoice);
-        const fileName = `voices-${bookName}.json`;
+        // Create/get book subfolder
+        const bookFolder = await directoryHandle.getDirectoryHandle(bookName, { create: true });
+        // Export with sorted and filtered voices
+        const json = exportToJSONSorted(characters, voiceMap, assignments, this.options.narratorVoice);
+        const fileName = `${bookName}.json`;
 
-        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+        const fileHandle = await bookFolder.getFileHandle(fileName, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(json);
         await writable.close();
 
-        this.reportProgress(0, 0, `Saved voice mapping: ${fileName}`);
+        this.reportProgress(0, 0, `Saved voice mapping: ${bookName}/${fileName}`);
       } catch {
         // Non-fatal error - don't fail the whole save if voice mapping fails
         this.reportProgress(0, 0, 'Warning: Could not save voice mapping');

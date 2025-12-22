@@ -10,10 +10,8 @@ import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { Button } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import {
-  exportToJSON,
   importFromJSON,
   applyImportedMappings,
-  downloadJSON,
   readJSONFile,
 } from '@/services/VoiceMappingService';
 
@@ -78,13 +76,6 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
       rate: settings.rate.value,
       pitch: settings.pitch.value,
     });
-  };
-
-  const handleExport = () => {
-    const json = exportToJSON(characters, voiceMap, settings.narratorVoice.value);
-    const bookName = 'voices';
-    downloadJSON(json, `${bookName}-${new Date().toISOString().slice(0, 10)}.json`);
-    logs.info('Voice mapping exported');
   };
 
   const handleImportClick = () => {
@@ -229,16 +220,11 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
           )}
         </div>
 
-        {/* Import/Export buttons */}
+        {/* Import button */}
         <div className="px-4 py-3 border-t border-border">
-          <div className="flex gap-2">
-            <Button onClick={handleImportClick} className="flex-1">
-              <Text id="voiceReview.import">Import JSON</Text>
-            </Button>
-            <Button onClick={handleExport} className="flex-1">
-              <Text id="voiceReview.export">Export JSON</Text>
-            </Button>
-          </div>
+          <Button onClick={handleImportClick} className="w-full">
+            <Text id="voiceReview.import">Import JSON</Text>
+          </Button>
           <input
             ref={fileInputRef}
             type="file"

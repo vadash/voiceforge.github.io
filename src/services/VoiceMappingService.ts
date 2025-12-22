@@ -1,7 +1,11 @@
 // Voice Mapping Service
 // Handles export/import of character-to-voice mappings
 
-import type { LLMCharacter } from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
+import { countSpeakingFrequency } from '@/services/llm/CharacterUtils';
+
+/** Minimum speaking percentage to include a character in export (0.05%) */
+export const MIN_SPEAKING_PERCENTAGE = 0.0005;
 
 /**
  * A single voice mapping entry
@@ -30,6 +34,42 @@ export function exportToJSON(
   narratorVoice: string
 ): string {
   const voices: VoiceMappingEntry[] = characters.map(char => ({
+    name: char.canonicalName,
+    voice: voiceMap.get(char.canonicalName) ?? '',
+    gender: char.gender,
+  }));
+
+  const data: VoiceMappingFile = {
+    version: 1,
+    narrator: narratorVoice,
+    voices,
+  };
+
+  return JSON.stringify(data, null, 2);
+}
+
+/**
+ * Export characters and voice mappings to JSON string, sorted by speaking frequency
+ * Filters out characters speaking less than MIN_SPEAKING_PERCENTAGE of total chunks
+ */
+export function exportToJSONSorted(
+  characters: LLMCharacter[],
+  voiceMap: Map<string, string>,
+  assignments: SpeakerAssignment[],
+  narratorVoice: string
+): string {
+  const frequency = countSpeakingFrequency(assignments);
+  const totalChunks = assignments.length;
+  const minChunks = Math.ceil(totalChunks * MIN_SPEAKING_PERCENTAGE);
+
+  // Filter and sort characters by frequency
+  const sortedCharacters = characters
+    .filter(char => (frequency.get(char.canonicalName) ?? 0) >= minChunks)
+    .sort((a, b) =>
+      (frequency.get(b.canonicalName) ?? 0) - (frequency.get(a.canonicalName) ?? 0)
+    );
+
+  const voices: VoiceMappingEntry[] = sortedCharacters.map(char => ({
     name: char.canonicalName,
     voice: voiceMap.get(char.canonicalName) ?? '',
     gender: char.gender,
