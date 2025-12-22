@@ -5,7 +5,8 @@ import PQueue from 'p-queue';
 import { createPool, Pool } from 'generic-pool';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
-import { withRetry } from '@/utils/asyncUtils';
+import { withRetry, AbortError } from '@/utils/asyncUtils';
+import { isAppError } from '@/errors';
 import type { IWorkerPool, PoolTask, WorkerPoolProgress, ILogger } from './interfaces';
 
 export interface WorkerPoolOptions {
@@ -223,6 +224,12 @@ export class TTSWorkerPool implements IWorkerPool {
           maxRetries: Infinity, // Never give up - missing chunks would ruin the audiobook
           baseDelay: 2000,
           maxDelay: 30000,
+          shouldRetry: (error) => {
+            // Only stop for explicit cancellation - retry everything else forever
+            if (error instanceof AbortError) return false;
+            if (isAppError(error) && error.isCancellation()) return false;
+            return true;
+          },
           onRetry: (attempt, err, delay) => {
             this.logger?.warn(
               `Retrying task ${task.partIndex} (Attempt ${attempt}). Waiting ${Math.round(delay)}ms. Error: ${err}`

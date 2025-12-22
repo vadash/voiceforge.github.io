@@ -37,7 +37,7 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 ### Key Services (`src/services/`)
 
 - **EdgeTTSService**: WebSocket client for Edge TTS API
-- **TTSWorkerPool**: Queue-based worker pool with retry logic (3 retries, exponential backoff)
+- **TTSWorkerPool**: Queue-based worker pool with infinite retry (exponential backoff)
 - **FileConverter**: Converts FB2/EPUB/ZIP to plain text
 - **AudioMerger**: Merges audio by ~30min duration, supports Opus via FFmpeg
 - **FFmpegService**: Singleton for FFmpeg WASM (CDN fallback chain)
@@ -48,9 +48,12 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 Optional multi-voice audiobooks using LLM-based character detection:
 
 - **Three-pass system**: Extract → Merge → Assign
-- **3-Way Voting** (optional): Calls LLM 3x with different temps for Assign step, uses majority vote (tiebreaker: 0.0). Debug logs disagreements to console.
+- **Retry behavior**:
+  - Extract: Infinite retry
+  - Merge: Up to 5-way voting, then use pair algo
+  - Assign: Up to X retries, fallback to narrator voice for all. Optional 3-way voting: calls LLM 3x with different temps for Assign step, uses majority vote
+  - TTS: Infinite retry (never lose chunks)
 - Uses sparse output format with character codes (A-Z, 0-9, a-z) for token reduction
-- Infinite retry with exponential backoff
 - Logs to: `logs/extract_*.json`, `logs/merge_*.json`, `logs/assign_*.json`
 
 ### State Management (`src/stores/`)

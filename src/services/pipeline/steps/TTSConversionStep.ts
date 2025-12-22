@@ -5,6 +5,7 @@
 import { BasePipelineStep, PipelineContext } from '../types';
 import type { IWorkerPool, WorkerPoolOptions, PoolTask } from '@/services/interfaces';
 import type { TTSConfig, SpeakerAssignment } from '@/state/types';
+import { getErrorMessage } from '@/errors';
 
 /**
  * Options for TTSConversionStep
@@ -78,15 +79,25 @@ export class TTSConversionStep extends BasePipelineStep {
           config: this.options.ttsConfig,
           directoryHandle: directoryHandle,
           onStatusUpdate: (update) => {
-            this.reportProgress(audioMap.size, chunks.length, update.message);
+            // Only report retry messages (important for user visibility)
+            if (update.message.includes('Retry')) {
+              this.reportProgress(audioMap.size, chunks.length, update.message);
+            }
           },
           onTaskComplete: (partIndex, filename) => {
             audioMap.set(partIndex, filename);
-            this.reportProgress(audioMap.size, chunks.length, `Written ${audioMap.size}/${chunks.length} files`);
+            const completed = audioMap.size;
+            // Calculate interval based on 0.5% of total, but max 200 items
+            const percentageInterval = Math.max(1, Math.floor(chunks.length * 0.005));
+            const maxInterval = 200;
+            const reportInterval = Math.min(percentageInterval, maxInterval);
+            if (completed % reportInterval === 0 || completed === chunks.length) {
+              this.reportProgress(completed, chunks.length, `Written ${completed}/${chunks.length} files`);
+            }
           },
           onTaskError: (partIndex, error) => {
             failedTasks.add(partIndex);
-            this.reportProgress(audioMap.size, chunks.length, `Part ${partIndex + 1} failed: ${error.message}`);
+            this.reportProgress(audioMap.size, chunks.length, `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`);
           },
           onAllComplete: () => {
             resolve();
