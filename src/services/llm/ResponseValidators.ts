@@ -138,6 +138,10 @@ export function validateAssignResponse(
     // Handles: "123:A", "[123]:A", "123:A (name)", "54:FEMALE_UNNAMED"
     const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
     if (!match) {
+      // Skip incomplete lines like "0:" or "3:" (model uncertainty) - don't error
+      if (/^\[?\d+\]?:$/.test(trimmed)) {
+        continue;
+      }
       errors.push(`Invalid format: "${trimmed}". Expected: index:code`);
       continue;
     }

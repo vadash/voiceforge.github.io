@@ -1,5 +1,4 @@
 // LLM Prompt: Dialogue Speaker Attribution
-// Optimized for Royal Road / LitRPG / Fantasy Web Fiction
 
 export const assignPrompt = {
   systemPrefix: `# DIALOGUE SPEAKER ATTRIBUTION SYSTEM
@@ -202,39 +201,6 @@ Use conversation flow (alternating pattern) or assign to most recently active ch
 
 ---
 
-## CHAIN OF THOUGHT
-
-<scratchpad_instructions>
-Use <scratchpad> tags before output:
-
-For each paragraph:
-1. Check [brackets] → System?
-2. Check speech tags → Named character?
-3. Check action beats → Acting character?
-4. Check first-person "I" → Protagonist?
-5. Use conversation flow if needed
-
-Example:
-<scratchpad>
-Speakers: A=Erick, B=Jane, C=System
-
-0: Erick tightened his grip. "All I'm saying is you can call more often."
-   → Action beat "Erick tightened" → 0:A
-
-1: "Dad," Jane stressed. "Come on."
-   → Speech tag "Jane stressed" → 1:B
-
-2: [Level Up! You have reached Level 5]
-   → Square brackets = System → 2:C
-
-3: "What's happening out there?"
-   → No tags. Previous conversation: Erick→Jane. Alternating: Jane spoke last.
-   → Context: Erick is driving, reacting → 3:A
-</scratchpad>
-</scratchpad_instructions>
-
----
-
 ## OUTPUT FORMAT
 
 <output_format>
@@ -373,8 +339,7 @@ Note: John's actions closest to dialogue in 0,1.
 ## BEGIN ASSIGNMENT
 
 Analyze the paragraphs below. Apply Attribution Methods in priority order.
-First reason in <scratchpad> tags, then output index:CODE pairs.
-One line per paragraph.`,
+Output index:CODE pairs, one line per paragraph.`,
   userTemplate: `<dialogue_paragraphs>
 {{paragraphs}}
 </dialogue_paragraphs>
@@ -383,14 +348,14 @@ One line per paragraph.`,
 Assign speaker code to each numbered paragraph.
 Use speaker codes from <speaker_list> in system prompt.
 
-Use <scratchpad> to analyze:
+Apply in order:
 1. [Brackets] → System
 2. Speech tags → Named character
 3. Action beats → Acting character
 4. First-person "I" → Protagonist
 5. Conversation flow if needed
 
-Then output ONLY index:CODE pairs (one per line).
+Output ONLY index:CODE pairs (one per line).
 
 Remember:
 - [Bracketed] = System

@@ -171,36 +171,6 @@ Only include characters whose ACTUAL WORDS appear in dialogue markers.
 
 ---
 
-## CHAIN OF THOUGHT
-
-<scratchpad_instructions>
-Use <scratchpad> tags before JSON output:
-1. List all dialogue markers found
-2. Attribute each to a speaker
-3. Check for same-person references to merge
-4. Verify gender evidence
-5. Validate completeness
-
-Example:
-<scratchpad>
-1. Found dialogue:
-   - "Good morning, Marcus!" (Sarah waving - action beat)
-   - [Level Up!] (square brackets = System)
-   - "Finally." (Marcus smiled - action beat)
-
-2. Attribution:
-   - "Good morning, Marcus!" → Sarah (vocative trap: Marcus is addressed, not speaking)
-   - [Level Up!] → System
-   - "Finally." → Marcus
-
-3. No merges needed
-
-4. Gender: Sarah=female (she), System=female (convention), Marcus=male (he)
-</scratchpad>
-</scratchpad_instructions>
-
----
-
 ## OUTPUT FORMAT
 
 <output_format>
@@ -299,13 +269,13 @@ Note: Marcus is only mentioned, never speaks - NOT included.
 <instruction>
 Extract ALL speaking characters from <input_text>.
 
-Use <scratchpad> to reason:
+Steps:
 1. Find all dialogue markers
 2. Attribute each to speaker
 3. Merge same-person references
 4. Check gender evidence
 
-Then output valid JSON only.
+Output valid JSON only.
 
 Remember:
 - [Bracketed] = System
