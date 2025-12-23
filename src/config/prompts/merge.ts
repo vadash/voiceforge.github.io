@@ -394,32 +394,36 @@ Inside <scratchpad>, work through these steps:
 Example:
 <scratchpad>
 Characters to analyze:
-0. "Protagonist" (unknown)
-1. "Jason" (male)
-2. "System" (female)
-3. "Interface" (female)
-4. "The Dark Lord" (male)
-5. "Azaroth" (male)
+0. canonicalName: "Marcus Stone", variations: ["Marcus Stone","Marcus","Protagonist","The Wizard"], gender: male
+1. canonicalName: "Marcus", variations: ["Marcus","Marc","Protagonist"], gender: male
+2. canonicalName: "System", variations: ["System","Rozeta"], gender: female
+3. canonicalName: "Interface", variations: ["Interface","Game Interface","Blue Box"], gender: female
+4. canonicalName: "The Dark Lord", variations: ["The Dark Lord","Dark Lord","Malachar"], gender: male
+5. canonicalName: "Malachar", variations: ["Malachar","Lord Malachar","The Dark Lord"], gender: male
+6. canonicalName: "Elena", variations: ["Elena"], gender: female
+7. canonicalName: "The King", variations: ["The King"], gender: male
+8. canonicalName: "The Prince", variations: ["The Prince"], gender: male
 
-Step 1 - Potential duplicates:
-- "Protagonist" + "Jason" → both could be narrator?
-- "System" + "Interface" → LitRPG convention, same entity
-- "The Dark Lord" + "Azaroth" → title + name pattern
+Step 1 - Potential duplicates (check variations overlap):
+- Entry 0 + Entry 1 → both have "Marcus" and "Protagonist" in variations → SAME PERSON
+- Entry 2 + Entry 3 → System/Interface are LitRPG game interface variants → SAME ENTITY
+- Entry 4 + Entry 5 → both have "Malachar" and "The Dark Lord" in variations → SAME PERSON
+- Entry 7 + Entry 8 → "The King" vs "The Prince" are different roles → DIFFERENT PEOPLE
 
 Step 2 - Apply merge rules:
-- Protagonist (unknown) + Jason (male) → Jason is likely narrator → MERGE, keep Jason (1)
-- System + Interface → both game interface → MERGE, keep System (2)
-- The Dark Lord + Azaroth → title + proper name → MERGE, keep Azaroth (5)
+- Marcus Stone has fuller name than Marcus → keep index 0, absorb index 1
+- System is canonical for game interfaces → keep index 2, absorb index 3
+- Malachar is proper name vs title → keep index 5, absorb index 4
 
 Step 3 - Anti-merge check:
-- No family relationships
-- No gender conflicts (Protagonist is unknown, resolves to male)
-- No different roles
+- Entry 7 "The King" and Entry 8 "The Prince" → different roles, do NOT merge
+- No family member patterns
+- No gender conflicts
 
 Step 4 - Final groups:
-- [1, 0] → Jason absorbs Protagonist
+- [0, 1] → Marcus Stone absorbs Marcus
 - [2, 3] → System absorbs Interface
-- [5, 4] → Azaroth absorbs The Dark Lord
+- [5, 4] → Malachar absorbs The Dark Lord
 </scratchpad>
 
 Then output your JSON result. The scratchpad will be automatically stripped.
@@ -453,64 +457,110 @@ You MUST output ONLY valid JSON. No markdown. No explanations.
 <output_examples>
 
 **Example 1: No Merges Needed**
-Input characters:
-0. canonicalName: "John"
-1. canonicalName: "Mary"
-2. canonicalName: "System"
+Input:
+0. canonicalName: "Marcus", variations: ["Marcus"], gender: male
+1. canonicalName: "Elena", variations: ["Elena"], gender: female
+2. canonicalName: "System", variations: ["System"], gender: female
+
 Output:
 {"merges": []}
 
-**Example 2: Protagonist Merge**
-Input characters:
-0. canonicalName: "Protagonist"
-1. canonicalName: "Elena"
-2. canonicalName: "Guard"
-(Elena is the protagonist)
-Output:
-{"merges": [[1, 0]]}
-(Keep Elena at index 1, absorb Protagonist at index 0)
+**Example 2: Variations Overlap - Same Person**
+Input:
+0. canonicalName: "Marcus Stone", variations: ["Marcus Stone","Marcus","Protagonist","Archmage"], gender: male
+1. canonicalName: "Marcus", variations: ["Marcus","Protagonist","Marc"], gender: male
+2. canonicalName: "Elena", variations: ["Elena"], gender: female
 
-**Example 3: System Unification**
-Input characters:
-0. canonicalName: "System"
-1. canonicalName: "Interface"
-2. canonicalName: "Blue Box"
-3. canonicalName: "Sarah"
+Reasoning: Entry 0 and 1 share "Marcus" and "Protagonist" in variations → same person. Keep fuller name.
+Output:
+{"merges": [[0, 1]]}
+
+**Example 3: System/Interface Unification**
+Input:
+0. canonicalName: "System", variations: ["System","Goddess"], gender: female
+1. canonicalName: "Interface", variations: ["Interface","Game Interface","Blue Box"], gender: female
+2. canonicalName: "Notification", variations: ["Notification","Alert"], gender: female
+3. canonicalName: "Elena", variations: ["Elena"], gender: female
+
+Reasoning: System, Interface, Notification are all LitRPG game interface variants → merge into System.
 Output:
 {"merges": [[0, 1, 2]]}
-(Keep System at index 0, absorb Interface and Blue Box)
 
-**Example 4: Multiple Merges**
-Input characters:
-0. canonicalName: "Protagonist"
-1. canonicalName: "Jason"
-2. canonicalName: "System"
-3. canonicalName: "Interface"
-4. canonicalName: "The King"
-5. canonicalName: "Ranvar"
-6. canonicalName: "Sarah"
-7. canonicalName: "The Guard"
+**Example 4: Title in Variations - Same Person**
+Input:
+0. canonicalName: "The Dark Lord", variations: ["The Dark Lord","Dark Lord","Malachar"], gender: male
+1. canonicalName: "Malachar", variations: ["Malachar","Lord Malachar","The Dark Lord"], gender: male
+2. canonicalName: "Elena", variations: ["Elena","The Hero"], gender: female
+
+Reasoning: Entry 0 and 1 share "Malachar" and "The Dark Lord" → same person. Keep proper name.
 Output:
-{"merges": [[1, 0], [2, 3], [5, 4]]}
-(Jason absorbs Protagonist, System absorbs Interface, Ranvar absorbs The King)
+{"merges": [[1, 0]]}
 
-**Example 5: Title and Name Merge**
-Input characters:
-0. canonicalName: "The Dark Lord"
-1. canonicalName: "Azaroth"
-2. canonicalName: "The Hero"
-3. canonicalName: "Elena"
-4. canonicalName: "System"
+**Example 5: Multiple Merge Groups**
+Input:
+0. canonicalName: "Marcus Stone", variations: ["Marcus Stone","Marcus","Protagonist"], gender: male
+1. canonicalName: "Protagonist", variations: ["Protagonist","Marcus"], gender: male
+2. canonicalName: "System", variations: ["System"], gender: female
+3. canonicalName: "Interface", variations: ["Interface","System"], gender: female
+4. canonicalName: "The Blacksmith", variations: ["The Blacksmith","Gareth"], gender: male
+5. canonicalName: "Gareth", variations: ["Gareth","The Blacksmith","Smith"], gender: male
+6. canonicalName: "Elena", variations: ["Elena"], gender: female
+
+Reasoning:
+- Entry 0+1: share "Marcus" and "Protagonist" → merge, keep Marcus Stone
+- Entry 2+3: Interface has "System" in variations → merge, keep System
+- Entry 4+5: share "Gareth" and "The Blacksmith" → merge, keep Gareth
 Output:
-{"merges": [[1, 0], [3, 2]]}
-(Azaroth absorbs The Dark Lord, Elena absorbs The Hero)
+{"merges": [[0, 1], [2, 3], [5, 4]]}
 
-**Example 6: No Merge - Different People**
-Input characters:
-0. canonicalName: "The King"
-1. canonicalName: "The Prince"
-2. canonicalName: "The Queen"
-(These are different people - do not merge)
+**Example 6: No Merge - Different Roles**
+Input:
+0. canonicalName: "The King", variations: ["The King","King Aldric"], gender: male
+1. canonicalName: "The Prince", variations: ["The Prince","Prince Dorian"], gender: male
+2. canonicalName: "The Queen", variations: ["The Queen","Queen Vera"], gender: female
+
+Reasoning: King/Prince/Queen are different royal roles with no overlapping variations → different people.
+Output:
+{"merges": []}
+
+**Example 7: No Merge - Gender Conflict**
+Input:
+0. canonicalName: "Alex", variations: ["Alex","Alexander"], gender: male
+1. canonicalName: "Alex", variations: ["Alex","Alexandra"], gender: female
+2. canonicalName: "System", variations: ["System"], gender: female
+
+Reasoning: Both named Alex but different genders and different full names → different people.
+Output:
+{"merges": []}
+
+**Example 8: Chain Merge - Three Entries Same Person**
+Input:
+0. canonicalName: "Theron Brightflame", variations: ["Theron Brightflame","Theron","Archmage","The Wizard"], gender: male
+1. canonicalName: "The Wizard", variations: ["The Wizard","Wizard","Theron"], gender: male
+2. canonicalName: "Protagonist", variations: ["Protagonist","Theron","Archmage"], gender: male
+3. canonicalName: "Elena", variations: ["Elena"], gender: female
+
+Reasoning: All three entries share "Theron" in variations → all same person. Keep fullest proper name.
+Output:
+{"merges": [[0, 1, 2]]}
+
+**Example 9: Nickname in Variations**
+Input:
+0. canonicalName: "Victoria Ashford", variations: ["Victoria Ashford","Victoria","Lady Ashford"], gender: female
+1. canonicalName: "Vicki", variations: ["Vicki","Victoria","Vic"], gender: female
+2. canonicalName: "Guard", variations: ["Guard"], gender: male
+
+Reasoning: Entry 0 and 1 share "Victoria" in variations → same person. Keep full formal name.
+Output:
+{"merges": [[0, 1]]}
+
+**Example 10: No Merge - Family Members**
+Input:
+0. canonicalName: "John Smith", variations: ["John Smith","John","Father"], gender: male
+1. canonicalName: "John's Father", variations: ["John's Father","Old Smith"], gender: male
+2. canonicalName: "Sarah Smith", variations: ["Sarah Smith","Sarah"], gender: female
+
+Reasoning: "John Smith" and "John's Father" are different people despite shared surname → do NOT merge.
 Output:
 {"merges": []}
 

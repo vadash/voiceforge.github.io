@@ -394,23 +394,38 @@ Inside <scratchpad>, work through each paragraph using the decision flowchart:
 
 Example:
 <scratchpad>
-Analyzing paragraphs with speakers A=John, B=Mary, C=System, D=Protagonist:
+Analyzing paragraphs with speakers A=Erick, B=Jane, C=System, D=The Darkness, E=Guard:
 
-0: John smiled. "Hello there!"
-   → Action beat "John smiled" before dialogue → Speaker = John → 0:A
+0: Erick lightened his grip on the steering wheel. "All I'm saying is that you can call more often."
+   → Action beat "Erick lightened his grip" before dialogue → Speaker = Erick → 0:A
 
-1: "Nice to meet you," Mary replied.
-   → Speech tag "Mary replied" → Speaker = Mary → 1:B
+1: "Dad," Jane stressed. "Come on. We've gone over this already."
+   → Speech tag "Jane stressed" → Speaker = Jane → 1:B
 
-2: [Quest Accepted: Find the Lost Sword]
-   → Square brackets = LitRPG system → Speaker = System → 2:C
+2: [Level Up! You have reached Level 5]
+   → Square brackets = LitRPG system message → Speaker = System → 2:C
 
-3: I nodded. "Let's do this."
-   → First-person "I nodded" → Speaker = Protagonist → 3:D
+3: "What the fuck is happening out there."
+   → No speech tag, no action beat. Previous speaker was System (not in conversation).
+   → Before System message, conversation was Erick→Jane. Check context...
+   → Scene context: Erick is driving, reacting to road changes → Speaker = Erick → 3:A
 
-4: "Be careful," the old man warned.
-   → Speech tag "the old man warned" → Need to match to code...
-   → Check speaker list... E=Old Man → 4:E
+4: "Just stop, Dad! Fu—" Jane must have seen what he had already seen.
+   → Action beat "Jane must have seen" + vocative "Dad" (Jane addressing Erick)
+   → Speaker = Jane → 4:B
+
+5: I nodded, silently.
+   → First-person "I nodded" but NO dialogue in this paragraph
+   → Wait, this has no quotes - should not be in dialogue list. Skip or error.
+
+6: "That cannot be the end of the song."
+   → No speech tag, no action beat. Check context...
+   → Previous speaker was Erick (singing). This is a response.
+   → Scene: The Darkness is responding to Erick's song → Speaker = The Darkness → 6:D
+
+7: "I am utterly terrified and cannot remember the rest."
+   → No explicit tag. Alternating pattern: Darkness spoke, now response.
+   → Context: Erick was singing, Darkness asked about song → Erick responds → 7:A
 </scratchpad>
 
 Then output ONLY the index:CODE pairs. The scratchpad will be automatically stripped.
@@ -444,21 +459,124 @@ For EACH paragraph, output exactly ONE line:
 Paragraph 0: A (extra text)
 </output_format>
 
-<output_example>
-**Example Input:**
+<output_examples>
+
+**Example 1: Basic Attribution (Action Beats + Speech Tags)**
+Speaker codes: A=John, B=Mary, C=System
+
+Input paragraphs:
 0: John smiled. "Hello there!"
 1: "Nice to meet you," Mary replied.
-2: [Quest Accepted: Find the Lost Sword]
-3: I nodded. "Let's do this."
-4: "Be careful," the old man warned.
+2: John frowned. "Is something wrong?"
+3: "No, just tired." Mary shook her head.
 
-**Example Output** (assuming John=A, Mary=B, System=C, Protagonist=D, Old Man=E):
+Output:
 0:A
 1:B
-2:C
-3:D
-4:E
-</output_example>
+2:A
+3:B
+
+Note: Paragraph 0 has action beat "John smiled" → A. Paragraph 1 has speech tag "Mary replied" → B. Alternating pattern continues with action beats.
+
+**Example 2: LitRPG System Messages**
+Speaker codes: A=Jason, B=Guide, C=System
+
+Input paragraphs:
+0: [Level Up! You have reached Level 10]
+1: [New Skill Unlocked: Fireball]
+2: Jason pumped his fist. "Finally!"
+3: The guide nodded. "Congratulations, young mage."
+4: [Warning: Mana reserves low]
+
+Output:
+0:C
+1:C
+2:A
+3:B
+4:C
+
+Note: All [bracketed] paragraphs → System (C). Action beats identify Jason and guide.
+
+**Example 3: Vocative Trap Avoidance**
+Speaker codes: A=Sarah, B=John, C=Protagonist
+
+Input paragraphs:
+0: Sarah rushed in. "John, wake up! We need to leave!"
+1: John groaned. "Five more minutes..."
+2: "John, this is serious!" Sarah grabbed his arm.
+3: I watched them argue. "Both of you, calm down."
+
+Output:
+0:A
+1:B
+2:A
+3:C
+
+Note: "John" inside quotes in paragraphs 0 and 2 is VOCATIVE (Sarah addressing John), NOT John speaking. Action beats confirm Sarah speaks. Paragraph 3 has first-person "I" → Protagonist.
+
+**Example 4: First-Person Narrator + Telepathy**
+Speaker codes: A=Protagonist, B=Familiar, C=System
+
+Input paragraphs:
+0: <Master, enemies approach from the north>
+1: I gripped my staff tighter. "How many?"
+2: <At least a dozen, Master>
+3: "Then we fight," I declared.
+
+Output:
+0:B
+1:A
+2:B
+3:A
+
+Note: <Angle brackets> indicate telepathy from Familiar. First-person "I" paragraphs → Protagonist.
+
+**Example 5: Conversation Flow (No Explicit Tags)**
+Speaker codes: A=Erick, B=Jane
+
+Input paragraphs:
+0: "Internships don't always end in a job offer."
+1: "And sometimes they do."
+2: "My record isn't spotless. I'm not a legacy."
+3: "You can speak Russian and Chinese!"
+4: "Mandarin, Dad. And I can barely speak it."
+
+Output:
+0:B
+1:A
+2:B
+3:A
+4:B
+
+Note: No action beats or speech tags. Use conversation flow: speakers alternate. "Dad" vocative in paragraph 4 confirms Jane is speaking TO Erick, so Jane = speaker of 4.
+
+**Example 6: Proximity Principle**
+Speaker codes: A=Sarah, B=John, C=Marcus
+
+Input paragraphs:
+0: Sarah walked into the room. John stood up. "Welcome!"
+1: Marcus glanced at Sarah. John nodded. "Please, sit down."
+2: "Thank you." Sarah took a seat.
+
+Output:
+0:B
+1:B
+2:A
+
+Note: Paragraph 0 has two actions - John's is CLOSEST to dialogue → B. Paragraph 1 also has John's action closest → B. Paragraph 2 has Sarah's action → A.
+
+**Example 7: Multiple Speakers in Paragraph**
+Speaker codes: A=John, B=Sarah
+
+Input paragraphs:
+0: "Run!" John shouted. "I'm trying!" Sarah yelled back. "Faster!" John urged.
+
+Output:
+0:A
+
+Note: Multiple speakers in one paragraph. Count: John=2, Sarah=1. John is DOMINANT speaker → A.
+
+</output_examples>
 
 ---
 

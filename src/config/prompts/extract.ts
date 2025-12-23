@@ -502,23 +502,28 @@ Inside <scratchpad>, work through these steps:
 Example:
 <scratchpad>
 1. Found dialogue markers:
-   - Line 3: "Hello there!" (double quotes)
-   - Line 5: [Level Up!] (square brackets = System)
-   - Line 8: "I must leave," said John (speech tag)
+   - "Good morning, Marcus!" (double quotes - Sarah speaking TO Marcus, vocative trap)
+   - [Level Up! You have reached Level 5] (square brackets = System)
+   - "Finally, some progress." (double quotes, action beat: Marcus smiled)
+   - "Well done, young mage." The old man nodded. (speech tag + action beat)
 
 2. Speaker attribution:
-   - "Hello there!" → John (action beat before: "John smiled")
+   - "Good morning, Marcus!" → Sarah (action beat before: "Sarah waved")
    - [Level Up!] → System (LitRPG convention)
-   - "I must leave," said John → John (explicit tag)
+   - "Finally, some progress." → Marcus (action beat after: "Marcus smiled")
+   - "Well done, young mage." → The old man / Guide Aldric (later revealed as same person)
 
 3. Same-person check:
-   - "John" and "The Guard" both appear - context shows John IS the guard → merge
+   - "The old man" and "Guide Aldric" both appear - context shows they're same person → merge
+   - Marcus is addressed in vocative but also speaks → include (he speaks elsewhere)
 
 4. Gender evidence:
-   - John: "he" pronoun → male
-   - System: default → female
+   - Sarah: "she" pronoun → female
+   - Marcus: "he" pronoun → male
+   - System: LitRPG convention → female
+   - Guide Aldric: "old man" descriptor → male
 
-5. Final character list: John (male), System (female)
+5. Final character list: Sarah (female), System (female), Marcus (male), Guide Aldric (male)
 </scratchpad>
 
 Then output your JSON result. The scratchpad will be automatically stripped.
@@ -556,25 +561,33 @@ You MUST output ONLY valid JSON. No markdown. No explanations. No preamble. No p
 
 <output_examples>
 
-**Example 1: Simple Dialogue**
+**Example 1: Simple Dialogue with Action Beats**
 Input:
 John smiled at her. "Good morning!"
 "Morning," Mary replied with a yawn.
+John frowned. "You look tired."
+"Late night," she admitted.
 
 Output:
 {"characters": [{"canonicalName": "John", "variations": ["John"], "gender": "male"}, {"canonicalName": "Mary", "variations": ["Mary"], "gender": "female"}]}
 
-**Example 2: LitRPG with System**
+Note: John speaks twice (action beats: "smiled", "frowned"). Mary speaks twice (speech tag: "replied", pronoun "she"). Gender from pronouns: "her" for Mary, context for John.
+
+**Example 2: LitRPG with System Messages**
 Input:
 [Level Up! You have reached Level 10]
 [New Skill Unlocked: Fireball]
+[Warning: Mana reserves low]
 Jason pumped his fist. "Finally!"
 The guide nodded. "Congratulations, young mage."
+"Thank you, Master Chen," Jason bowed.
 
 Output:
-{"characters": [{"canonicalName": "System", "variations": ["System"], "gender": "female"}, {"canonicalName": "Jason", "variations": ["Jason"], "gender": "male"}, {"canonicalName": "Guide", "variations": ["Guide", "The Guide"], "gender": "unknown"}]}
+{"characters": [{"canonicalName": "System", "variations": ["System"], "gender": "female"}, {"canonicalName": "Jason", "variations": ["Jason"], "gender": "male"}, {"canonicalName": "Master Chen", "variations": ["Master Chen", "Chen", "The Guide", "Guide"], "gender": "unknown"}]}
 
-**Example 3: First-Person with Telepathy**
+Note: All [bracketed messages] = System (female by LitRPG convention). "The guide" and "Master Chen" are same person (context: Jason addresses the guide as "Master Chen").
+
+**Example 3: First-Person Narrator with Telepathy**
 Input:
 <Master, enemies approach from the north> my familiar's voice echoed in my mind.
 I gripped my staff tighter. "How many?"
@@ -584,6 +597,8 @@ I gripped my staff tighter. "How many?"
 Output:
 {"characters": [{"canonicalName": "Familiar", "variations": ["Familiar"], "gender": "unknown"}, {"canonicalName": "Protagonist", "variations": ["Protagonist"], "gender": "unknown"}]}
 
+Note: First-person "I" speaks dialogue → Protagonist. Telepathy in <angle brackets> from familiar. Narrator's name not revealed, so use "Protagonist". No gender pronouns for either.
+
 **Example 4: Non-English Names (Russian)**
 Input:
 Иван нахмурился. «Это плохие новости».
@@ -592,9 +607,9 @@ Input:
 Output:
 {"characters": [{"canonicalName": "Иван", "variations": ["Иван"], "gender": "male"}, {"canonicalName": "Мария", "variations": ["Мария"], "gender": "female"}]}
 
-Note: Names are preserved in their original Cyrillic script, NOT translated to "Ivan" and "Maria".
+Note: Names preserved in original Cyrillic script, NOT translated to "Ivan" and "Maria". Gender from Russian grammar: "Согласна" is feminine form.
 
-**Example 5: Complex Scene with Merges**
+**Example 5: Title + Proper Name Merge**
 Input:
 The Dark Lord rose from his throne. "Who dares disturb me?"
 Commander Reynolds stepped forward. "Lord Azaroth, we bring news of the rebellion."
@@ -604,7 +619,9 @@ Azaroth's eyes narrowed. "Speak, Commander."
 Output:
 {"characters": [{"canonicalName": "Azaroth", "variations": ["Azaroth", "The Dark Lord", "Dark Lord", "Lord Azaroth"], "gender": "male"}, {"canonicalName": "Commander Reynolds", "variations": ["Commander Reynolds", "Reynolds", "Commander", "The Commander"], "gender": "unknown"}]}
 
-**Example 6: Vocative Case Trap (Correct Handling)**
+Note: "The Dark Lord" speaks first, then "Azaroth" speaks - context shows same person (sits on throne, eyes narrow). Commander speaks twice (alternating dialogue). "Lord Azaroth" and "my Lord" are vocatives (addressed TO Azaroth, not BY Azaroth).
+
+**Example 6: Vocative Trap - Correct Handling**
 Input:
 Sarah rushed into the room. "John, wake up! We need to leave!"
 John groaned. "Five more minutes..."
@@ -613,7 +630,43 @@ John groaned. "Five more minutes..."
 Output:
 {"characters": [{"canonicalName": "Sarah", "variations": ["Sarah"], "gender": "female"}, {"canonicalName": "John", "variations": ["John"], "gender": "male"}]}
 
-Note: "John" inside the quotes is Sarah addressing John, not John speaking. Only actual speakers are included.
+Note: "John" inside quotes is vocative (Sarah addressing John), NOT John speaking. Sarah speaks twice (action beats). John speaks once. Both are included because both actually speak.
+
+**Example 7: Named Protagonist in First-Person**
+Input:
+My name is Elena, and I never asked for this power.
+[Class Unlocked: Shadow Mage]
+I stared at the notification. "What the hell?"
+The old man chuckled. "Welcome to your new life, child."
+
+Output:
+{"characters": [{"canonicalName": "Elena", "variations": ["Elena", "Protagonist"], "gender": "female"}, {"canonicalName": "System", "variations": ["System"], "gender": "female"}, {"canonicalName": "The Old Man", "variations": ["The Old Man", "Old Man"], "gender": "male"}]}
+
+Note: Narrator's name revealed ("My name is Elena") → use "Elena" as canonicalName, include "Protagonist" in variations. Gender from context. System for [bracketed message].
+
+**Example 8: Multiple Non-Human Speakers**
+Input:
+The dragon lowered its massive head. "You dare enter my domain, mortal?"
+<Be careful, Master> Whisper's voice echoed in my mind. <This one is ancient.>
+I drew my sword. "I come seeking the artifact, great wyrm."
+"Hah!" The dragon's laugh shook the cavern. "Bold words for a snack."
+
+Output:
+{"characters": [{"canonicalName": "Dragon", "variations": ["Dragon", "The Dragon", "Great Wyrm"], "gender": "male"}, {"canonicalName": "Whisper", "variations": ["Whisper"], "gender": "unknown"}, {"canonicalName": "Protagonist", "variations": ["Protagonist"], "gender": "unknown"}]}
+
+Note: Dragon speaks twice (action beats). Familiar named "Whisper" uses telepathy. First-person "I" narrator speaks. Dragon gender = male (genre convention for unnamed dragons).
+
+**Example 9: Mentioned But Not Speaking**
+Input:
+"Have you seen Marcus?" Sarah asked.
+The guard shook his head. "Not since yesterday."
+"What about Elena? Or the King?"
+"Lady Elena passed through an hour ago. The King remains in his chambers."
+
+Output:
+{"characters": [{"canonicalName": "Sarah", "variations": ["Sarah"], "gender": "female"}, {"canonicalName": "Guard", "variations": ["Guard", "The Guard"], "gender": "unknown"}]}
+
+Note: Only Sarah and the guard SPEAK. Marcus, Elena, and the King are merely MENTIONED - they have no dialogue, so they are NOT included.
 
 </output_examples>
 
