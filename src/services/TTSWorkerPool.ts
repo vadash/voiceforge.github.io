@@ -221,9 +221,9 @@ export class TTSWorkerPool implements IWorkerPool {
           });
         },
         {
-          maxRetries: Infinity, // Never give up - missing chunks would ruin the audiobook
-          baseDelay: 2000,
-          maxDelay: 30000,
+          maxRetries: 11, // Try for 1 hour in total then skip
+          baseDelay: 10 * 1000,
+          maxDelay: 600 * 1000,
           shouldRetry: (error) => {
             // Only stop for explicit cancellation - retry everything else forever
             if (error instanceof AbortError) return false;
