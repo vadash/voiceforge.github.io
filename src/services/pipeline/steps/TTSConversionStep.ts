@@ -87,11 +87,20 @@ export class TTSConversionStep extends BasePipelineStep {
           onTaskComplete: (partIndex, filename) => {
             audioMap.set(partIndex, filename);
             const completed = audioMap.size;
-            // Calculate interval based on 0.5% of total, but max 200 items
-            const percentageInterval = Math.max(1, Math.floor(chunks.length * 0.005));
-            const maxInterval = 200;
-            const reportInterval = Math.min(percentageInterval, maxInterval);
-            if (completed % reportInterval === 0 || completed === chunks.length) {
+
+            // Calculate interval based on 1% of total
+            const percentageInterval = Math.max(1, Math.floor(chunks.length * 0.01));
+            const minInterval = 50;
+            const maxInterval = 500;
+            const step = 50;
+            // Clamp to min/max range first
+            const clampedInterval = Math.max(minInterval, Math.min(percentageInterval, maxInterval));
+            // Round to nearest multiple of 50
+            const reportInterval = Math.round(clampedInterval / step) * step;
+            // Ensure final value stays within bounds (in case rounding pushed it over)
+            const finalInterval = Math.max(minInterval, Math.min(reportInterval, maxInterval));
+            
+            if (completed % finalInterval === 0 || completed === chunks.length) {
               this.reportProgress(completed, chunks.length, `Written ${completed}/${chunks.length} files`);
             }
           },
