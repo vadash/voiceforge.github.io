@@ -23,9 +23,9 @@ export class TextSanitizationStep extends BasePipelineStep {
     const sanitizedAssignments = assignments.map((assignment, index) => {
       const sanitizedText = this.sanitize(assignment.text);
 
-      if ((index + 1) % 100 === 0) {
-        this.reportProgress(index + 1, assignments.length, `Sanitized ${index + 1}/${assignments.length}`);
-      }
+      // if ((index + 1) % 100 === 0) {
+      //   this.reportProgress(index + 1, assignments.length, `Sanitized ${index + 1}/${assignments.length}`);
+      // }
 
       return {
         ...assignment,
