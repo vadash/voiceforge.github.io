@@ -313,7 +313,8 @@ export class AudioMerger implements IAudioMerger {
           toIndex: group.toIndex,
         };
       } catch (err) {
-        onProgress?.(`FFmpeg error, falling back to MP3: ${(err as Error).message}`);
+        const msg = err instanceof Error ? err.message : String(err);
+        onProgress?.(`FFmpeg error, falling back to MP3: ${msg}`);
         // Fall through to MP3 fallback
       }
     }

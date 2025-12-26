@@ -25,6 +25,8 @@ export class FFmpegService implements IFFmpegService {
   private loaded = false;
   private loadError: string | null = null;
   private logger?: ILogger;
+  private operationCount = 0;
+  private readonly MAX_OPERATIONS_BEFORE_REFRESH = 10;
 
   constructor(logger?: ILogger) {
     this.logger = logger;
@@ -101,11 +103,24 @@ export class FFmpegService implements IFFmpegService {
     config: AudioProcessingConfig,
     onProgress?: (message: string) => void
   ): Promise<Uint8Array> {
-    if (!this.ffmpeg || !this.loaded) {
-      throw new Error('FFmpeg not loaded');
+    // Proactively refresh FFmpeg to prevent WASM memory exhaustion after many operations
+    if (this.operationCount >= this.MAX_OPERATIONS_BEFORE_REFRESH) {
+      this.logger?.debug(`FFmpeg: Proactive refresh after ${this.operationCount} operations`);
+      this.terminate();
     }
 
-    const ffmpeg = this.ffmpeg;
+    // Reload if needed (after termination or if not loaded)
+    if (!this.ffmpeg || !this.loaded) {
+      const loaded = await this.load(onProgress);
+      if (!loaded) {
+        throw new Error('FFmpeg failed to load');
+      }
+    }
+
+    this.operationCount++;
+
+    // Safe to assert non-null: load() returning true guarantees ffmpeg is set
+    const ffmpeg = this.ffmpeg!;
     // Track files written to cleanup later
     const inputFiles: (string | null)[] = [];
 
@@ -201,14 +216,22 @@ export class FFmpegService implements IFFmpegService {
     } catch (err) {
       // Cleanup on error - be aggressive
       const writtenFiles = inputFiles.filter((f): f is string => f !== null);
-      await this.cleanup(writtenFiles);
 
-      // If we didn't track any files yet, or if something else is stuck, run full sweep
-      if (writtenFiles.length === 0) {
-        await this.cleanupAll();
+      try {
+        await this.cleanup(writtenFiles);
+        if (writtenFiles.length === 0) {
+          await this.cleanupAll();
+        }
+      } catch (cleanupErr) {
+        this.logger?.warn(`FFmpeg cleanup failed during error handling: ${String(cleanupErr)}`);
       }
 
-      throw new Error(`FFmpeg processing failed: ${(err as Error).message}`);
+      // Terminate the instance as it's likely corrupted or OOM
+      // This forces isAvailable() to return false, ensuring clean fallback to MP3
+      this.terminate();
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      throw new Error(`FFmpeg processing failed: ${errorMessage}`);
     }
   }
 
@@ -308,6 +331,7 @@ export class FFmpegService implements IFFmpegService {
       this.loaded = false;
       this.loadPromise = null;
     }
+    this.operationCount = 0;
   }
 }
 
